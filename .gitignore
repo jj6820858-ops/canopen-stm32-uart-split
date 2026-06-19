@@ -1,0 +1,27 @@
+# Build output
+Debug/
+build/
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.axf
+*.map
+
+# IDE files
+.settings/
+.cproject
+.project
+.config
+.config.old
+*.uvoptx
+*.uvprojx
+*.uvguix
+DebugConfig/
+jlink*
+
+# RT-Thread Studio
+.metadata/
+RELEASE_NOTE.txt
+*.rttlaunch

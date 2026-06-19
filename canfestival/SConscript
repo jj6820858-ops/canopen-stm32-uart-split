@@ -1,0 +1,43 @@
+import os
+from building import *
+
+cwd = GetCurrentDir()
+RTT_ROOT = os.path.normpath(cwd + '/../rt-thread')
+src = []
+
+# CANfestival core (exclude Linux-only symbols.c)
+core_files = [
+    'dcf.c', 'emcy.c', 'lifegrd.c', 'lss.c',
+    'nmtMaster.c', 'nmtSlave.c', 'objacces.c',
+    'pdo.c', 'sdo.c', 'states.c', 'sync.c', 'timer.c',
+]
+for f in core_files:
+    src.append(cwd + '/src/' + f)
+
+# Platform port
+src += Glob('port/*.c')
+
+# Object dictionary
+src += Glob('od_master/*.c')
+
+# Include paths
+inc = [
+    cwd + '/include',
+    cwd + '/port',
+    cwd + '/od_master',
+    RTT_ROOT + '/include',
+    RTT_ROOT + '/components/drivers/include',
+    RTT_ROOT + '/components/finsh',
+    cwd + '/../libraries/STM32F1xx_HAL_Driver/Inc',
+    cwd + '/../libraries/STM32F1xx_HAL_Driver/Inc/Legacy',
+    cwd + '/../libraries/CMSIS/Device/ST/STM32F1xx/Include',
+    cwd + '/../libraries/CMSIS/Include',
+    cwd + '/../drivers/include',
+    cwd + '/../drivers/include/config',
+    cwd + '/../drivers',
+]
+
+group = DefineGroup('canfestival', src,
+                    depend=[''],
+                    CPPPATH=inc)
+Return('group')
