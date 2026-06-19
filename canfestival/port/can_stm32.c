@@ -38,9 +38,9 @@ static void can_set_baudrate(char *baud)
         init->TimeSeg1 = CAN_BS1_5TQ;
         init->TimeSeg2 = CAN_BS2_3TQ;
     } else {
-        /* 50K default (PCLK1=32MHz) */
-        init->Prescaler = 40;
-        init->TimeSeg1 = CAN_BS1_13TQ;
+        /* 50K default (PCLK1=36MHz) */
+        init->Prescaler = 60;
+        init->TimeSeg1 = CAN_BS1_9TQ;
         init->TimeSeg2 = CAN_BS2_2TQ;
     }
     init->Mode = CAN_MODE_NORMAL;
@@ -114,8 +114,7 @@ void can_hardware_init(void)
     HAL_NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
 
-    /* Auto-start CAN test: send frame every 5000ms */
-    can_test_auto_start(5000);
+    /* CAN test thread disabled - CANopen stack handles all CAN communication */
 }
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)

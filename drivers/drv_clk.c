@@ -24,23 +24,12 @@ void system_clock_config(int target_freq_Mhz)
 
     /** Initializes the CPU, AHB and APB busses clocks
     */
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-#if defined(STM32F100xB) || defined(STM32F100xE)
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;
-#endif
-#if defined(STM32F101x6) || defined(STM32F101xB) || defined(STM32F101xE) || defined(STM32F101xG)
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
-#endif
-#if defined(STM32F102x6) || defined(STM32F102xB)
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL12;
-#endif
-#if defined(STM32F103x6) || defined(STM32F103xB) || defined(STM32F103xE) || defined(STM32F103xG)
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
-#endif
 #if defined(STM32F105xC) || defined(STM32F107xC)
     RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
 #endif
