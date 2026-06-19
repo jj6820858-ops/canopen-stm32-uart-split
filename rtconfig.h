@@ -133,6 +133,49 @@
 
 /* IoT - internet of things */
 
+#define PKG_USING_FREEMODBUS
+#define PKG_FREEMODBUS_VERSION "latest"
+/* #define PKG_MODBUS_MASTER_RTU */
+#define PKG_MODBUS_SLAVE
+/* #define PKG_MODBUS_MASTER_RTU_AND_SLAVE */
+#define PKG_MODBUS_SLAVE_RTU
+/* #define PKG_MODBUS_SLAVE_ASCII */
+/* #define PKG_MODBUS_SLAVE_TCP */
+/* #define PKG_MODBUS_SLAVE_SAMPLE */
+
+/*
+ * FreeModbus register map for 快检设备 protocol
+ * Register addresses (1-based):
+ *   00001~00033  - 功能/状态区 (Function/Status)
+ *   00100~00104  - 实时数据 (Real-time Data)
+ *   00120~00198  - 参数设置 (Parameter Settings)
+ */
+#define RT_S_DISCRETE_INPUT_START      0
+#define RT_S_DISCRETE_INPUT_NDISCRETES 0
+#define RT_S_COIL_START                0
+#define RT_S_COIL_NCOILS               0
+#define RT_S_REG_INPUT_START           0
+#define RT_S_REG_INPUT_NREGS           0
+#define RT_S_REG_HOLDING_START         0
+#define RT_S_REG_HOLDING_NREGS         200   /* 1~198 + margin */
+#define RT_S_HD_RESERVE                0
+#define RT_S_IN_RESERVE                0
+#define RT_S_CO_RESERVE                0
+#define RT_S_DI_RESERVE                0
+
+/* FreeModbus register map for Master mode (kept for compilation) */
+#define RT_M_DISCRETE_INPUT_START      0
+#define RT_M_DISCRETE_INPUT_NDISCRETES 16
+#define RT_M_COIL_START                0
+#define RT_M_COIL_NCOILS               16
+#define RT_M_REG_INPUT_START           0
+#define RT_M_REG_INPUT_NREGS           100
+#define RT_M_REG_HOLDING_START         0
+#define RT_M_REG_HOLDING_NREGS         100
+#define RT_M_HD_RESERVE                0
+#define RT_M_IN_RESERVE                0
+#define RT_M_CO_RESERVE                0
+#define RT_M_DI_RESERVE                0
 
 /* Wi-Fi */
 
@@ -276,9 +319,5 @@
 
 /* end of samples: kernel and components samples */
 #define RT_STUDIO_BUILT_IN
-
-/* CAN Bus */
-#define BSP_USING_CAN
-#define BSP_USING_CAN1
 
 #endif

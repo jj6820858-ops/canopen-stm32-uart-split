@@ -1,0 +1,77 @@
+menuconfig PKG_USING_FREEMODBUS
+    bool "FreeModbus: Modbus protocol stack (Master/Slave)"
+    default n
+    select RT_USING_SERIAL
+    select RT_USING_DEVICE_IPC
+    help
+        FreeModbus is a Modbus ASCII/RTU/TCP protocol stack.
+        It supports both Master and Slave mode.
+
+if PKG_USING_FREEMODBUS
+
+    config PKG_FREEMODBUS_VERSION
+        string "FreeModbus version"
+        default "latest"
+        help
+            Select the FreeModbus package version.
+
+    choice
+        prompt "Modbus mode"
+        default PKG_MODBUS_MASTER_RTU
+        help
+            Select Modbus operation mode.
+
+        config PKG_MODBUS_MASTER_RTU
+            bool "Master RTU mode"
+            help
+                Modbus Master RTU mode.
+
+        config PKG_MODBUS_SLAVE
+            bool "Slave mode (RTU/ASCII/TCP)"
+            help
+                Modbus Slave mode.
+
+        config PKG_MODBUS_MASTER_RTU_AND_SLAVE
+            bool "Both Master RTU and Slave"
+            help
+                Enable both Master RTU and Slave modes.
+    endchoice
+
+    if PKG_MODBUS_SLAVE || PKG_MODBUS_MASTER_RTU_AND_SLAVE
+        config PKG_MODBUS_SLAVE_RTU
+            bool "Enable Slave RTU"
+            default y
+            help
+                Modbus Slave RTU mode.
+
+        config PKG_MODBUS_SLAVE_ASCII
+            bool "Enable Slave ASCII"
+            default n
+            help
+                Modbus Slave ASCII mode.
+
+        config PKG_MODBUS_SLAVE_TCP
+            bool "Enable Slave TCP"
+            default n
+            depends on RT_USING_SAL
+            help
+                Modbus Slave TCP mode.
+    endif
+
+    if PKG_MODBUS_SLAVE || PKG_MODBUS_MASTER_RTU_AND_SLAVE
+        config PKG_MODBUS_SLAVE_SAMPLE
+            bool "Enable Slave sample"
+            default n
+            help
+                Enable Modbus Slave sample code.
+    endif
+
+    if PKG_MODBUS_MASTER_RTU || PKG_MODBUS_MASTER_RTU_AND_SLAVE
+        config PKG_MODBUS_MASTER_SAMPLE
+            bool "Enable Master sample"
+            default n
+            help
+                Enable Modbus Master sample code.
+    endif
+
+endif
