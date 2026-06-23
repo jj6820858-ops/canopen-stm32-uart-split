@@ -3,14 +3,14 @@
 将串口自定义协议转为 CANopen，让上位机通过简单串口帧即可控制 CANopen 从站设备。
 
 ```
-上位机 ──串口(AA55帧)──▶ STM32(CANopen Master) ──CANopen──▶ 从站MCU(CANfestival Slave)
+上位机 ──Modbus RTU──▶ STM32(CANopen Master) ──CANopen──▶ 从站MCU(CANfestival Slave)
 ```
 
 ## 项目背景
 
 原有架构是「上位机 ↔ 串口 ↔ 从机 MCU」，上位机通过自定义寄存器协议直接与下位机通信。现在需要引入 CANopen 总线，但上位机软件不方便改协议栈。因此做了这个网关：
 
-**串口进去，CANopen 出来**——上位机完全不知道 CANopen 的存在，照常发它的寄存器读写帧，网关负责查路由表、发 SDO/PDO、收应答、转成串口响应送回上位机。
+**Modbus RTU 进去，CANopen 出来**——上位机通过标准 Modbus RTU 协议与网关通信，网关查路由表、发 SDO/PDO、收应答、更新本地寄存器送回上位机。
 
 ## 硬件需求
 
@@ -59,7 +59,6 @@ STM32 CAN1           CAN 总线
 ```
 applications/
 ├── main.c                  初始化入口，启动三个模块
-├── serial_protocol.c/.h    AA55 帧状态机解析（收/发/校验）
 ├── reg_router.c/.h         协议地址 → CANopen OD 映射表（路由表）
 └── canopen_master.c/.h     CANfestival 主站封装（初始化/回调/SDO链式配置）
 
@@ -76,10 +75,10 @@ canfestival/                CANfestival 协议栈（移植版）
 ### 数据流
 
 ```
-串口 RX 收到 AA55 帧
+UART2 RX 收到 Modbus RTU 帧
       │
       ▼
-serial_protocol 解析帧 → 校验 XOR → 识别命令
+FreeModbus 解析 → CRC 校验 → 识别 FC 码
       │
       ▼
 reg_router 查路由表：协议地址 → (NodeID=0x02, OD Index/SubIndex)
@@ -88,40 +87,29 @@ reg_router 查路由表：协议地址 → (NodeID=0x02, OD Index/SubIndex)
 canopen_master 执行 SDO 上传/下载，或通过 PDO 收发
       │
       ▼
-CAN 总线 → 从站 (Node 0x02) 响应 → 串口回帧给上位机
+CAN 总线 → 从站 (Node 0x02) 响应 → Modbus 回帧给上位机
 ```
 
 ## 串口协议定义
 
-### 帧格式
+### Modbus RTU (UART2)
 
+标准 Modbus RTU，可从站地址 `CONFIG_MODBUS_SLAVE_ADDR`（默认 1），
+波特率 `CONFIG_MODBUS_BAUD_RATE`（默认 115200），8N1：
+
+| 功能码 | 命令 | 说明 |
+|--------|------|------|
+| `0x03` | FC03 读保持寄存器 | 读取寄存器，自动走 CANopen SDO |
+| `0x06` | FC06 写单个寄存器 | 写本地寄存器 + 异步同步到 CANopen |
+| `0x10` | FC16 写多个寄存器 | 写多寄存器 + 异步同步到 CANopen |
+
+**示例**（FC06 写 00004 = 123）:
 ```
-起始符  命令   地址(LE)  长度   数据     校验
-┌────┐ ┌──┐ ┌──────┐ ┌──┐ ┌────┐ ┌──────┐
-AA 55 | CMD | AddrL AddrH | Len | Data… | XOR |
-```
-
-| 字段 | 长度 | 说明 |
-|------|------|------|
-| `AA 55` | 2B | 帧起始 |
-| CMD | 1B | `0x03`=读取，`0x06`=写单个，`0x10`=写多个 |
-| Addr | 2B | 协议寄存器地址，小端序 |
-| Len | 1B | 读=寄存器个数；写=数据字节数 |
-| Data | NB | 写操作的数据载荷 |
-| XOR | 1B | 前面所有字节的异或校验和 |
-
-### 错误响应
-
-```
-AA 55 FF | 错误码 | ADDR_L | ADDR_H | 00 | XOR
+发送: 01 06 00 03 00 7B 39 E9
+接收: 01 06 00 03 00 7B 39 E9
 ```
 
-| 错误码 | 含义 |
-|--------|------|
-| `0x01` | 校验和错误 |
-| `0x02` | 未知命令 |
-| `0x03` | 地址无路由（或 SDO 超时） |
-| `0x04` | 访问权限错误 |
+详见 [测试计划](docs/test-plan.md)。
 
 ## 寄存器映射
 
@@ -158,27 +146,34 @@ make -j
 
 ### 3. 串口测试
 
-打开串口助手（115200 8N1，**HEX 模式发送/接收**）：
+打开串口助手连接 UART2（115200 8N1，**HEX 模式发送/接收**）：
 
 ```
-# 读蠕动泵转速
-发送: AA 55 03 08 00 01 FE
-响应: AA 55 03 08 00 02 [2字节数据] [XOR]
+# 读蠕动泵转速 (寄存器 00008)
+发送: 01 03 00 07 00 01 34 0A
+响应: 01 03 02 [2字节数据] [CRC]
 
-# 写转速=500 (0x01F4)
-发送: AA 55 06 08 00 02 F4 01 52
-响应: AA 55 06 08 00 00 FE
+# 写转速=500 (0x01F4) 到 00008
+发送: 01 06 00 07 01 F4 F8 1C
+响应: 01 06 00 07 01 F4 F8 1C
 ```
 
-上电后串口助手会先收到系统日志：
+上电后 UART1 控制台先收到系统日志：
 ```
 ====================================
- CANopen Master Protocol Gateway
+ CANopen Master + Modbus Slave GW
  STM32F103RCT6, RT-Thread v4.0.3
 ====================================
 ```
 
-**注意**：串口助手不要追加回车换行，否则 XOR 校验失败。
+也可通过 UART1 控制台输入 MSH 命令测试：
+```
+msh> mb_test 4         # 自动写读验证
+msh> mb_read 8         # 读寄存器 00008
+msh> mb_write 4 123    # 写 00004 = 123
+msh> mb_dump           # 打印所有寄存器
+msh> mb_sim 4          # 模拟 Modbus 读（强制走 CANopen）
+```
 
 ## 构建状态
 
@@ -199,10 +194,9 @@ make -j
 ## 路线图
 
 - [x] CANfestival 移植到 RT-Thread + STM32F1
-- [x] 串口 AA55 帧协议解析
-- [x] 寄存器路由表（30+ 条映射）
-- [x] SDO 链式从站配置
+- [x] Modbus RTU 从站协议（FreeModbus）
+- [x] 寄存器路由表（70+ 条映射）
+- [x] SDO 链式从站配置 + 异步写入
 - [x] PDO 策略（SYNC 触发 TPDO / 异步 RPDO）
 - [ ] 多从站支持（路由表扩展）
-- [ ] 串口日志级别可配置
 - [ ] 看门狗 + 掉线重连

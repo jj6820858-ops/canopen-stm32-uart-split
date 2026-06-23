@@ -28,5 +28,7 @@ void reg_router_init(void);
 const reg_route_entry_t *reg_lookup(uint16_t addr);
 int  reg_read(uint16_t start_addr, uint8_t count, uint8_t *out_buf);
 int  reg_write(uint16_t start_addr, uint8_t count, const uint8_t *data);
+int  reg_write_async(uint16_t start_addr, uint8_t count,
+                     const uint8_t *data, void (*done)(int result));
 
 #endif /* __REG_ROUTER_H__ */

@@ -1,4 +1,8 @@
 SRC_FILES :=
+# Application layer
+SRC_FILES +=$(BSP_ROOT)/applications/main.c
+SRC_FILES +=$(BSP_ROOT)/applications/reg_router.c
+SRC_FILES +=$(BSP_ROOT)/applications/canopen_master.c
 SRC_FILES +=$(BSP_ROOT)/canfestival/od_master/ObjDict.c
 SRC_FILES +=$(BSP_ROOT)/canfestival/port/can_stm32.c
 SRC_FILES +=$(BSP_ROOT)/canfestival/port/timer_rtthread.c

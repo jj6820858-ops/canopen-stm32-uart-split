@@ -10,7 +10,7 @@
 #include <string.h>
 
 #define DBG_TAG "modbus"
-#define DBG_LVL DBG_LOG
+#define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
 /*------------------------Slave mode buffers (unused, keep for compilation)------*/
@@ -43,8 +43,7 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
 {
     eMBErrorCode eStatus = MB_ENOERR;
 
-    /* DEBUG: log every callback entry */
-    LOG_I("HOLDING CB: %s addr=%d n=%d",
+    LOG_D("HOLDING CB: %s addr=%d n=%d",
           (eMode == MB_REG_READ) ? "READ" : "WRITE",
           usAddress, usNRegs);
 
@@ -64,29 +63,35 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
         USHORT i;
         int ret = reg_read(usAddress + 1, usNRegs, pucRegBuffer);
         if (ret >= 0) {
-            LOG_I("RD addr=%d cnt=%d (CANopen OK %dB)", usAddress + 1, usNRegs, ret);
+            LOG_D("RD addr=%d cnt=%d (CANopen OK %dB)", usAddress + 1, usNRegs, ret);
             break;
         }
         /* Fallback: read from local buffer */
-        LOG_I("RD addr=%d cnt=%d (local buffer)", usAddress + 1, usNRegs);
+        LOG_D("RD addr=%d cnt=%d (local buffer)", usAddress + 1, usNRegs);
         for (i = 0; i < usNRegs; i++) {
             pucRegBuffer[i * 2]     = (UCHAR)(usSRegHoldBuf[usAddress + i] >> 8);
             pucRegBuffer[i * 2 + 1] = (UCHAR)(usSRegHoldBuf[usAddress + i] & 0xFF);
         }
         /* Print values for debugging */
         for (i = 0; i < usNRegs && i < 8; i++) {
-            LOG_I("  [%d] = 0x%04X", usAddress + 1 + i, usSRegHoldBuf[usAddress + i]);
+            LOG_D("  [%d] = 0x%04X", usAddress + 1 + i, usSRegHoldBuf[usAddress + i]);
         }
         break;
     }
 
     case MB_REG_WRITE: {
-        /* Write to local buffer (immediate, non-blocking) */
+        /* Write to local buffer (immediate) */
         USHORT i;
-        uint16_t val = (pucRegBuffer[0] << 8) | pucRegBuffer[1];
-        LOG_I("WR addr=%d val=0x%04X (%d)", usAddress + 1, val, val);
-        usSRegHoldBuf[usAddress] = val;
-        /* CANopen sync handled by background task - don't block here */
+        uint8_t *pSrc = pucRegBuffer;
+        LOG_I("WR addr=%d n=%d", usAddress + 1, usNRegs);
+        for (i = 0; i < usNRegs; i++) {
+            usSRegHoldBuf[usAddress + i] = (pSrc[0] << 8) | pSrc[1];
+            pSrc += 2;
+        }
+        /* Sync to CANopen via async SDO (non-blocking, logs on fail) */
+        if (reg_write_async(usAddress + 1, usNRegs, pucRegBuffer, NULL) != 0) {
+            LOG_W("CANopen async write failed to start");
+        }
         break;
     }
 

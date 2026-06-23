@@ -4,12 +4,12 @@
 #include "canopen_master.h"
 
 #define DBG_TAG "router"
-#define DBG_LVL DBG_LOG
+#define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
 /* SDO timeout: max wait per transfer (ms) */
-#define SDO_TIMEOUT_MS     500
-#define SDO_POLL_INTERVAL  20
+#define APP_SDO_TIMEOUT_MS      CONFIG_SDO_TIMEOUT_MS
+#define APP_SDO_POLL_INTERVAL   CONFIG_SDO_POLL_INTERVAL_MS
 
 /* ── Complete routing table ──────────────────────── */
 
@@ -144,10 +144,16 @@ void reg_router_init(void)
 
 const reg_route_entry_t *reg_lookup(uint16_t addr)
 {
-    for (int i = 0; i < ROUTE_COUNT; i++) {
-        if (addr >= g_routes[i].addr_start &&
-            addr <= g_routes[i].addr_end) {
-            return &g_routes[i];
+    /* Binary search on sorted non-overlapping routing table */
+    int lo = 0, hi = ROUTE_COUNT - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (addr < g_routes[mid].addr_start) {
+            hi = mid - 1;
+        } else if (addr > g_routes[mid].addr_end) {
+            lo = mid + 1;
+        } else {
+            return &g_routes[mid];
         }
     }
     return NULL;
@@ -204,8 +210,8 @@ int reg_read(uint16_t start_addr, uint8_t count, uint8_t *out_buf)
         }
 
         /* ── Poll for completion (responsive + bounded timeout) ── */
-        int poll_cnt = SDO_TIMEOUT_MS / SDO_POLL_INTERVAL;
-        UNS8 got_size = size;
+        int poll_cnt = APP_SDO_TIMEOUT_MS / APP_SDO_POLL_INTERVAL;
+        UNS32 got_size = size;
         UNS8 sdo_ok = 0;
         while (poll_cnt--) {
             if (getReadResultNetworkDict(&CanOpenMaster_Data, e->node_id,
@@ -214,7 +220,7 @@ int reg_read(uint16_t start_addr, uint8_t count, uint8_t *out_buf)
                 sdo_ok = 1;
                 break;
             }
-            rt_thread_mdelay(SDO_POLL_INTERVAL);
+            rt_thread_mdelay(APP_SDO_POLL_INTERVAL);
         }
         closeSDOtransfer(&CanOpenMaster_Data, e->node_id, SDO_CLIENT);
 
@@ -226,7 +232,7 @@ int reg_read(uint16_t start_addr, uint8_t count, uint8_t *out_buf)
 
         /* ── Cache result for contiguous same-entry addresses ── */
         last_entry = e;
-        last_size = got_size;
+        last_size = (uint8_t)got_size;
         memcpy(last_data, out_buf + total_bytes, got_size);
 
         total_bytes += got_size;
@@ -234,8 +240,163 @@ int reg_read(uint16_t start_addr, uint8_t count, uint8_t *out_buf)
     return total_bytes;
 }
 
+/* ── Single SDO write (helper, used by reg_write batch flush) ── */
+static int do_sdo_write(const reg_route_entry_t *e,
+                        const uint8_t *data, int len)
+{
+    UNS32 abortCode;
+    UNS8 rc = writeNetworkDict(&CanOpenMaster_Data, e->node_id,
+                               e->od_index, e->od_subindex,
+                               len, e->data_type,
+                               (void *)data, 0);
+    if (rc) {
+        LOG_E("SDO write failed: OD=0x%04X sub=0x%02X rc=%d",
+              e->od_index, e->od_subindex, rc);
+        return -1;
+    }
+
+    int poll_cnt = APP_SDO_TIMEOUT_MS / APP_SDO_POLL_INTERVAL;
+    UNS8 sdo_ok = 0;
+    while (poll_cnt--) {
+        if (getWriteResultNetworkDict(&CanOpenMaster_Data, e->node_id,
+                                      &abortCode) == SDO_FINISHED) {
+            sdo_ok = 1;
+            break;
+        }
+        rt_thread_mdelay(APP_SDO_POLL_INTERVAL);
+    }
+    closeSDOtransfer(&CanOpenMaster_Data, e->node_id, SDO_CLIENT);
+
+    if (!sdo_ok) {
+        LOG_E("SDO write timeout: OD=0x%04X (abort=0x%04lX)",
+              e->od_index, (unsigned long)abortCode);
+        return -1;
+    }
+    return 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * Async SDO write — non-blocking, callback-chained batch
+ *
+ * Pre-batches consecutive same-OD entries, kicks off SDOs via
+ * writeNetworkDictCallBack. The completion callback chains the
+ * next batch until all are done, then calls user's done().
+ *
+ * Only one async write can be in-flight at a time (static context).
+ * ══════════════════════════════════════════════════════════════════ */
+
+#define ASYNC_MAX_BATCH 8
+
+typedef struct {
+    const reg_route_entry_t *entry[ASYNC_MAX_BATCH];
+    uint8_t data[ASYNC_MAX_BATCH][8];
+    uint8_t len[ASYNC_MAX_BATCH];
+    uint8_t count;
+    uint8_t current;
+    void (*done)(int result);
+    int result;
+} async_write_t;
+
+static async_write_t g_aw;
+
+static void async_write_cb(CO_Data *d, UNS8 nodeId)
+{
+    (void)d; (void)nodeId;
+    UNS32 abortCode;
+
+    if (getWriteResultNetworkDict(d, nodeId, &abortCode) != SDO_FINISHED) {
+        LOG_E("Async SDO write fail: batch %d abort=0x%04lX",
+              g_aw.current, (unsigned long)abortCode);
+        g_aw.result = -1;
+    }
+    closeSDOtransfer(d, nodeId, SDO_CLIENT);
+
+    g_aw.current++;
+    if (g_aw.current >= g_aw.count) {
+        if (g_aw.done) g_aw.done(g_aw.result);
+        return;
+    }
+
+    /* Chain next batch */
+    writeNetworkDictCallBack(d, nodeId,
+        g_aw.entry[g_aw.current]->od_index,
+        g_aw.entry[g_aw.current]->od_subindex,
+        g_aw.len[g_aw.current],
+        g_aw.entry[g_aw.current]->data_type,
+        g_aw.data[g_aw.current],
+        async_write_cb, 0);
+}
+
+int reg_write_async(uint16_t start_addr, uint8_t count,
+                    const uint8_t *data, void (*done)(int result))
+{
+    if (g_aw.count > 0 && g_aw.current < g_aw.count) {
+        LOG_W("Async write already in progress, cancelling");
+    }
+
+    /* Phase 1: pre-batch */
+    const reg_route_entry_t *batch_entry = NULL;
+    int offset = 0;
+    g_aw.count = 0;
+    g_aw.current = 0;
+    g_aw.result = 0;
+    g_aw.done = done;
+
+    for (uint8_t i = 0; i < count; i++) {
+        uint16_t addr = start_addr + i;
+        const reg_route_entry_t *e = reg_lookup(addr);
+        if (!e || !(e->access & REG_WO)) {
+            LOG_E("Async write: invalid addr 0x%04X", addr);
+            if (done) done(-1);
+            return -1;
+        }
+
+        UNS8 size = type_size(e->data_type);
+
+        if (batch_entry && e == batch_entry) {
+            /* Same entry: accumulate */
+            memcpy(g_aw.data[g_aw.count - 1] + g_aw.len[g_aw.count - 1],
+                   data + offset, size);
+            g_aw.len[g_aw.count - 1] += size;
+        } else {
+            /* New entry: start a new batch slot */
+            if (g_aw.count >= ASYNC_MAX_BATCH) {
+                LOG_E("Async write: too many batches (%d max)", ASYNC_MAX_BATCH);
+                if (done) done(-1);
+                return -1;
+            }
+            g_aw.entry[g_aw.count] = e;
+            memcpy(g_aw.data[g_aw.count], data + offset, size);
+            g_aw.len[g_aw.count] = size;
+            g_aw.count++;
+            batch_entry = e;
+        }
+        offset += size;
+    }
+
+    if (g_aw.count == 0) {
+        if (done) done(0);
+        return 0;
+    }
+
+    /* Phase 2: kick off first batch */
+    writeNetworkDictCallBack(&CanOpenMaster_Data,
+        g_aw.entry[0]->node_id,
+        g_aw.entry[0]->od_index,
+        g_aw.entry[0]->od_subindex,
+        g_aw.len[0],
+        g_aw.entry[0]->data_type,
+        g_aw.data[0],
+        async_write_cb, 0);
+
+    return 0;
+}
+
 int reg_write(uint16_t start_addr, uint8_t count, const uint8_t *data)
 {
+    const reg_route_entry_t *batch_entry = NULL;
+    uint8_t batch_data[8] = {0};          /* Max CANopen OD byte count */
+    int batch_len = 0;
     int offset = 0;
 
     for (uint8_t i = 0; i < count; i++) {
@@ -252,36 +413,33 @@ int reg_write(uint16_t start_addr, uint8_t count, const uint8_t *data)
         }
 
         UNS8 size = type_size(e->data_type);
-        UNS32 abortCode;
-        UNS8 rc = writeNetworkDict(&CanOpenMaster_Data, e->node_id,
-                                   e->od_index, e->od_subindex,
-                                   size, e->data_type,
-                                   (void *)(data + offset), 0);
-        if (rc) {
-            LOG_E("SDO write failed: addr=0x%04X, rc=%d", addr, rc);
-            return -1;
+
+        /* ── Same OD entry as current batch? Accumulate ── */
+        if (batch_entry && e == batch_entry) {
+            memcpy(batch_data + batch_len, data + offset, size);
+            batch_len += size;
+            offset += size;
+            continue;
         }
 
-        /* ── Poll for completion ── */
-        int poll_cnt = SDO_TIMEOUT_MS / SDO_POLL_INTERVAL;
-        UNS8 sdo_ok = 0;
-        while (poll_cnt--) {
-            if (getWriteResultNetworkDict(&CanOpenMaster_Data, e->node_id,
-                                          &abortCode) == SDO_FINISHED) {
-                sdo_ok = 1;
-                break;
-            }
-            rt_thread_mdelay(SDO_POLL_INTERVAL);
-        }
-        closeSDOtransfer(&CanOpenMaster_Data, e->node_id, SDO_CLIENT);
-
-        if (!sdo_ok) {
-            LOG_E("SDO write timeout: 0x%04X (abort=0x%04lX)",
-                  addr, (unsigned long)abortCode);
-            return -1;
+        /* ── Flush previous batch ── */
+        if (batch_entry && batch_len > 0) {
+            if (do_sdo_write(batch_entry, batch_data, batch_len) != 0)
+                return -1;
         }
 
+        /* ── Start new batch ── */
+        batch_entry = e;
+        memcpy(batch_data, data + offset, size);
+        batch_len = size;
         offset += size;
     }
+
+    /* ── Flush final batch ── */
+    if (batch_entry && batch_len > 0) {
+        if (do_sdo_write(batch_entry, batch_data, batch_len) != 0)
+            return -1;
+    }
+
     return 0;
 }

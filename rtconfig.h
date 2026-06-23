@@ -163,6 +163,33 @@
 #define RT_S_CO_RESERVE                0
 #define RT_S_DI_RESERVE                0
 
+/*
+ * ═══════════════════════════════════════════════════════════════════
+ *  Application Config — CANopen Master + Modbus Gateway
+ * ═══════════════════════════════════════════════════════════════════
+ */
+
+/* CANopen: master node ID (1~127) */
+#define CONFIG_CANOPEN_MASTER_NODE_ID   0x01
+/* CANopen: target slave node ID (1~127) */
+#define CONFIG_CANOPEN_SLAVE_NODE_ID    0x02
+/* CANopen: bit rate for CAN1 (kbps) */
+#define CONFIG_CANOPEN_BAUD_RATE_K      50
+
+/* Modbus Slave: RTU address (1~247) */
+#define CONFIG_MODBUS_SLAVE_ADDR        1
+/* Modbus Slave: UART port number (1=UART1, 2=UART2) */
+#define CONFIG_MODBUS_SERIAL_PORT       2
+/* Modbus Slave: baud rate */
+#define CONFIG_MODBUS_BAUD_RATE         115200
+/* Modbus Slave: parity (MB_PAR_NONE / MB_PAR_ODD / MB_PAR_EVEN) */
+#define CONFIG_MODBUS_PARITY            MB_PAR_NONE
+
+/* SDO transaction timeout (ms) per transfer */
+#define CONFIG_SDO_TIMEOUT_MS           500
+/* SDO polling interval (ms) */
+#define CONFIG_SDO_POLL_INTERVAL_MS     20
+
 /* FreeModbus register map for Master mode (kept for compilation) */
 #define RT_M_DISCRETE_INPUT_START      0
 #define RT_M_DISCRETE_INPUT_NDISCRETES 16

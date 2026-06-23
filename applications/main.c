@@ -20,13 +20,13 @@
 #include <rtdbg.h>
 
 /* Modbus slave address (1~247) */
-#define MODBUS_SLAVE_ADDR       1
+#define MODBUS_SLAVE_ADDR       CONFIG_MODBUS_SLAVE_ADDR
 /* Modbus serial port number */
-#define MODBUS_SERIAL_PORT      2
+#define MODBUS_SERIAL_PORT      CONFIG_MODBUS_SERIAL_PORT
 /* Modbus baud rate */
-#define MODBUS_BAUD_RATE        115200
+#define MODBUS_BAUD_RATE        CONFIG_MODBUS_BAUD_RATE
 /* Modbus parity */
-#define MODBUS_PARITY           MB_PAR_NONE
+#define MODBUS_PARITY           CONFIG_MODBUS_PARITY
 
 static int freemodbus_slave_init(void)
 {
