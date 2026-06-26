@@ -287,6 +287,11 @@ static int do_sdo_write(const reg_route_entry_t *e,
 
 #define ASYNC_MAX_BATCH 8
 
+/* Max time to wait for an async SDO batch to complete before giving up.
+ * Without a slave on the bus, SDO callbacks never fire — this timeout
+ * prevents g_aw from being stuck forever. */
+#define ASYNC_SDO_TIMEOUT_TICKS  (RT_TICK_PER_SECOND * 2)  /* 2 s */
+
 typedef struct {
     const reg_route_entry_t *entry[ASYNC_MAX_BATCH];
     uint8_t data[ASYNC_MAX_BATCH][8];
@@ -295,15 +300,43 @@ typedef struct {
     uint8_t current;
     void (*done)(int result);
     int result;
+    rt_tick_t start_tick;       /* tick when current batch was kicked off */
+    uint8_t active;             /* 1 = SDO chain in flight */
 } async_write_t;
 
 static async_write_t g_aw;
 
+/* Reset g_aw to idle (done callback already dispatched by caller) */
+static void async_write_reset(void)
+{
+    g_aw.count = 0;
+    g_aw.current = 0;
+    g_aw.result = 0;
+    g_aw.done = NULL;
+    g_aw.active = 0;
+}
+
+/* Helper: force-close a pending SDO transfer for the current batch's node.
+ * Safe to call even if no transfer is actually pending. */
+static void async_write_abort(void)
+{
+    if (!g_aw.active)
+        return;
+    UNS8 node_id = g_aw.entry[g_aw.current]->node_id;
+    closeSDOtransfer(&CanOpenMaster_Data, node_id, SDO_CLIENT);
+    g_aw.active = 0;
+}
+
 static void async_write_cb(CO_Data *d, UNS8 nodeId)
 {
     (void)d; (void)nodeId;
-    UNS32 abortCode;
 
+    /* Guard: if the transfer was aborted (e.g. timeout or cancelled by a
+     * new write), ignore stale callback. */
+    if (!g_aw.active)
+        return;
+
+    UNS32 abortCode;
     if (getWriteResultNetworkDict(d, nodeId, &abortCode) != SDO_FINISHED) {
         LOG_E("Async SDO write fail: batch %d abort=0x%04lX",
               g_aw.current, (unsigned long)abortCode);
@@ -313,11 +346,15 @@ static void async_write_cb(CO_Data *d, UNS8 nodeId)
 
     g_aw.current++;
     if (g_aw.current >= g_aw.count) {
-        if (g_aw.done) g_aw.done(g_aw.result);
+        void (*cb)(int) = g_aw.done;
+        int r = g_aw.result;
+        async_write_reset();
+        if (cb) cb(r);
         return;
     }
 
     /* Chain next batch */
+    g_aw.start_tick = rt_tick_get();
     writeNetworkDictCallBack(d, nodeId,
         g_aw.entry[g_aw.current]->od_index,
         g_aw.entry[g_aw.current]->od_subindex,
@@ -330,8 +367,21 @@ static void async_write_cb(CO_Data *d, UNS8 nodeId)
 int reg_write_async(uint16_t start_addr, uint8_t count,
                     const uint8_t *data, void (*done)(int result))
 {
-    if (g_aw.count > 0 && g_aw.current < g_aw.count) {
-        LOG_W("Async write already in progress, cancelling");
+    if (g_aw.active) {
+        rt_tick_t elapsed = rt_tick_get() - g_aw.start_tick;
+        if (elapsed < ASYNC_SDO_TIMEOUT_TICKS) {
+            /* Previous SDO still in-flight and hasn't timed out.
+             * Data is already in the local buffer — SDO sync is
+             * best-effort.  Skip silently to avoid log spam and
+             * keep start_tick stable so the timeout can actually fire. */
+            return 0;
+        }
+        /* Timed out — slave likely offline.  Log once and abort. */
+        LOG_W("Async SDO timed out (slave offline), aborting old chain");
+        async_write_abort();
+        if (g_aw.done) {
+            g_aw.done(-1);
+        }
     }
 
     /* Phase 1: pre-batch */
@@ -380,6 +430,8 @@ int reg_write_async(uint16_t start_addr, uint8_t count,
     }
 
     /* Phase 2: kick off first batch */
+    g_aw.start_tick = rt_tick_get();
+    g_aw.active = 1;
     writeNetworkDictCallBack(&CanOpenMaster_Data,
         g_aw.entry[0]->node_id,
         g_aw.entry[0]->od_index,
