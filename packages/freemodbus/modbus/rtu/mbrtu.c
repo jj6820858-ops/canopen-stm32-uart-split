@@ -124,14 +124,12 @@ void
 eMBRTUStart( void )
 {
     ENTER_CRITICAL_SECTION(  );
-    /* Initially the receiver is in the state STATE_RX_INIT. we start
-     * the timer and if no character is received within t3.5 we change
-     * to STATE_RX_IDLE. This makes sure that we delay startup of the
-     * modbus protocol stack until the bus is free.
+    /* Start in IDLE state — bytes are stored immediately.
+     * Original code used STATE_RX_INIT but that discards the first
+     * byte of the very first frame (loses the Modbus slave addr).
      */
-    eRcvState = STATE_RX_INIT;
+    eRcvState = STATE_RX_IDLE;
     vMBPortSerialEnable( TRUE, FALSE );
-    vMBPortTimersEnable(  );
 
     EXIT_CRITICAL_SECTION(  );
 }
