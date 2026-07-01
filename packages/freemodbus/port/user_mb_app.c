@@ -1,9 +1,15 @@
 /*
  * FreeModbus Libary: user callback functions - 快检设备 protocol
- * Bridges Modbus requests to CANopen via reg_router.
+ * Bridges Modbus requests to CANopen local OD via reg_router.
  *
  * Copyright (C) 2013 Armink <armink.ztl@gmail.com>
  * Modifications for 快检设备 protocol (2026)
+ *
+ * Data flow:
+ *   READ:  Modbus ← reg_read() → CANopen local OD (getODentry)
+ *          Falls back to usSRegHoldBuf[] if no route / OD error.
+ *   WRITE: Modbus → usSRegHoldBuf[] (immediate)
+ *          → reg_write_async() → CANopen local OD (setODentry)
  */
 #include "user_mb_app.h"
 #include <reg_router.h>
@@ -59,11 +65,11 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
 
     switch (eMode) {
     case MB_REG_READ: {
-        /* Try CANopen first (reg_router), fall back to local buffer */
+        /* Try CANopen local OD first (reg_router), fall back to local buffer */
         USHORT i;
         int ret = reg_read(usAddress + 1, usNRegs, pucRegBuffer);
         if (ret >= 0) {
-            LOG_D("RD addr=%d cnt=%d (CANopen OK %dB)", usAddress + 1, usNRegs, ret);
+            LOG_D("RD addr=%d cnt=%d (local OD OK %dB)", usAddress + 1, usNRegs, ret);
             break;
         }
         /* Fallback: read from local buffer */
@@ -88,9 +94,9 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
             usSRegHoldBuf[usAddress + i] = (pSrc[0] << 8) | pSrc[1];
             pSrc += 2;
         }
-        /* Sync to CANopen via async SDO (non-blocking, logs on fail) */
+        /* Sync to CANopen local OD (non-blocking) */
         if (reg_write_async(usAddress + 1, usNRegs, pucRegBuffer, NULL) != 0) {
-            LOG_W("CANopen async write failed to start");
+            LOG_W("CANopen local OD write failed");
         }
         break;
     }

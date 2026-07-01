@@ -148,7 +148,7 @@ void TestMaster_post_SlaveBootup(CO_Data *d, UNS8 nodeId)
 static void InitNodes(CO_Data *d, UNS32 id)
 {
     (void)id;
-    setNodeId(&CanOpenMaster_Data, 0x01);
+    setNodeId(&CanOpenMaster_Data, 0x00);
     setState(&CanOpenMaster_Data, Initialisation);
 }
 
@@ -175,6 +175,6 @@ int canopen_master_init(void)
     /* 4. Init CANopen node once */
     InitNodes(&CanOpenMaster_Data, 0);
 
-    LOG_I("CANopen master started (Node ID=0x01, Slave=0x%02X)", SLAVE_NODE_ID);
+    LOG_I("CANopen master started (Node ID=0x00, Slave=0x%02X)", SLAVE_NODE_ID);
     return 0;
 }

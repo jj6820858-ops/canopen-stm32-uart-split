@@ -20,32 +20,45 @@ static volatile uint8_t   rx_head = 0;
 static volatile uint8_t   rx_tail = 0;
 static volatile uint8_t   rx_count = 0;
 
-/* Convert CANfestival baud string to prescaler */
+/* Convert CANfestival baud string to prescaler.
+ * APB1 clock = 36 MHz, 250 Kbps target:
+ *   TQ = Prescaler / 36MHz = 9 / 36MHz = 0.25 µs
+ *   BitTime = (1 + 11 + 4) × TQ = 16 × 0.25 µs = 4 µs
+ *   BaudRate = 1 / 4µs = 250 Kbps
+ */
 static void can_set_baudrate(char *baud)
 {
     CAN_InitTypeDef *init = &hcan1.Init;
 
+    /* Common settings for all baud rates */
+    init->Mode                = CAN_MODE_NORMAL;
+    init->SyncJumpWidth       = CAN_SJW_2TQ;
+    init->TimeTriggeredMode   = DISABLE;
+    init->AutoBusOff          = DISABLE;
+    init->AutoWakeUp          = DISABLE;
+    init->AutoRetransmission  = DISABLE;
+    init->ReceiveFifoLocked   = DISABLE;
+    init->TransmitFifoPriority = DISABLE;
+
     if (strstr(baud, "1M")) {
-        init->Prescaler = 4;
+        init->Prescaler = 2;
         init->TimeSeg1 = CAN_BS1_5TQ;
         init->TimeSeg2 = CAN_BS2_3TQ;
     } else if (strstr(baud, "500K")) {
-        init->Prescaler = 8;
-        init->TimeSeg1 = CAN_BS1_5TQ;
-        init->TimeSeg2 = CAN_BS2_3TQ;
+        init->Prescaler = 4;
+        init->TimeSeg1 = CAN_BS1_7TQ;
+        init->TimeSeg2 = CAN_BS2_2TQ;
     } else if (strstr(baud, "250K")) {
-        init->Prescaler = 16;
-        init->TimeSeg1 = CAN_BS1_5TQ;
-        init->TimeSeg2 = CAN_BS2_3TQ;
+        /* 250 Kbps: Prescaler=9, BS1=11TQ, BS2=4TQ, SJW=2TQ */
+        init->Prescaler = 9;
+        init->TimeSeg1 = CAN_BS1_11TQ;
+        init->TimeSeg2 = CAN_BS2_4TQ;
     } else {
         /* 50K default (PCLK1=36MHz) */
         init->Prescaler = 60;
         init->TimeSeg1 = CAN_BS1_9TQ;
         init->TimeSeg2 = CAN_BS2_2TQ;
     }
-    init->Mode = CAN_MODE_NORMAL;
-    init->SyncJumpWidth = CAN_SJW_1TQ;
-    init->AutoRetransmission = ENABLE;
 }
 
 static void can_test_auto_start(rt_uint32_t interval_ms);
@@ -79,8 +92,9 @@ void can_hardware_init(void)
     HAL_GPIO_Init(GPIOA, &gpio);
 
     hcan1.Instance = CAN1;
-    can_set_baudrate("50K");
-    rt_kprintf("[CAN] HAL_CAN_Init: state=%lu\n", (unsigned long)hcan1.State);
+    can_set_baudrate("250K");
+    rt_kprintf("[CAN] HAL_CAN_Init (250Kbps, SJW=2TQ, BS1=11TQ, BS2=4TQ): state=%lu\n",
+               (unsigned long)hcan1.State);
     if (HAL_CAN_Init(&hcan1) != HAL_OK) {
         rt_kprintf("[CAN] HAL_CAN_Init FAILED! ErrorCode=0x%08lx\n",
                    (unsigned long)hcan1.ErrorCode);
@@ -88,17 +102,20 @@ void can_hardware_init(void)
     }
     rt_kprintf("[CAN] HAL_CAN_Init OK, state=%lu\n", (unsigned long)hcan1.State);
 
-    /* Configure filter: accept all */
+    /* Configure filter 1: ID mask mode, 32-bit, accept all (CANopen master).
+     * FilterBank 1 (STM32F103 has filters 0-13 for CAN1).
+     * SlaveStartFilterBank=14 is reserved for CAN2 (not used on F103). */
     CAN_FilterTypeDef filter = {0};
-    filter.FilterBank = 0;
-    filter.FilterMode = CAN_FILTERMODE_IDMASK;
-    filter.FilterScale = CAN_FILTERSCALE_32BIT;
-    filter.FilterIdHigh = 0x0000;
-    filter.FilterIdLow = 0x0000;
-    filter.FilterMaskIdHigh = 0x0000;
-    filter.FilterMaskIdLow = 0x0000;
+    filter.FilterBank           = 1;
+    filter.FilterMode           = CAN_FILTERMODE_IDMASK;
+    filter.FilterScale           = CAN_FILTERSCALE_32BIT;
+    filter.FilterIdHigh         = 0x0000;
+    filter.FilterIdLow          = 0x0000;
+    filter.FilterMaskIdHigh     = 0x0000;
+    filter.FilterMaskIdLow      = 0x0000;
     filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-    filter.FilterActivation = ENABLE;
+    filter.FilterActivation     = ENABLE;
+    filter.SlaveStartFilterBank = 14;
     HAL_CAN_ConfigFilter(&hcan1, &filter);
 
     rt_kprintf("[CAN] HAL_CAN_Start: state=%lu\n", (unsigned long)hcan1.State);
@@ -179,7 +196,7 @@ UNS8 canSend(CAN_HANDLE fd, Message const *m)
             rt_kprintf("[CAN] Bus-Off detected in canSend, recovering...\n");
             HAL_CAN_Stop(&hcan1);
             CAN_FilterTypeDef filter = {0};
-            filter.FilterBank = 0;
+            filter.FilterBank = 1;
             filter.FilterMode = CAN_FILTERMODE_IDMASK;
             filter.FilterScale = CAN_FILTERSCALE_32BIT;
             filter.FilterIdHigh = 0x0000;
