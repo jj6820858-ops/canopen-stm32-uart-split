@@ -8,7 +8,7 @@
 #include "canfestival/od_master/ObjDict.h"
 
 #ifndef CONFIG_CANOPEN_SLAVE_NODE_ID
-#define CONFIG_CANOPEN_SLAVE_NODE_ID  0x02
+#define CONFIG_CANOPEN_SLAVE_NODE_ID  0x01
 #endif
 #define SLAVE_NODE_ID  CONFIG_CANOPEN_SLAVE_NODE_ID
 

@@ -60,8 +60,7 @@ int main(void) {
     rt_device_open(u2, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX);
 
     reg_router_init();
-    /* CAN disabled — no motor connected for Modbus test */
-    /* canopen_master_init(); */
+    canopen_master_init();
 
     rt_kprintf("\nSystem ready. Modbus addr=%d on UART2\n", SLAVE);
     rt_kprintf("FC06 writes → OD variables → PDO auto-send\n\n");
