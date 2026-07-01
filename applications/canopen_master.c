@@ -105,9 +105,8 @@ void TestMaster_initialisation(CO_Data *d)
 
 void TestMaster_preOperational(CO_Data *d)
 {
-    LOG_I("Master: preOperational, configuring slaves");
-    init_step = 0;
-    ConfigureSlaveNode(d, SLAVE_NODE_ID);
+    LOG_I("Master: preOperational → Operational (PDOs enabled)");
+    setState(d, Operational);
 }
 
 void TestMaster_operational(CO_Data *d)
