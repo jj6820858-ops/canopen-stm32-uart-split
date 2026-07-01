@@ -31,13 +31,13 @@ static uint16_t crc16(uint8_t *d, int len) {
 /* 路由表: Modbus地址→OD变量 */
 typedef struct { uint16_t addr; void *var; int size; } mb_route_t;
 static const mb_route_t routes[] = {
-    {4, &CanOpenMaster_obj2001, 1},   /* mX_modes */
-    {5, &CanOpenMaster_obj2005, 2},   /* mX_control_word */
-    {28, &CanOpenMaster_obj2004, 2},  /* mX_status_word */
-    {153, &CanOpenMaster_obj2003, 4}, /* mX_velocity */
-    {164, &CanOpenMaster_obj2002, 4}, /* mX_position */
-    {16, &CanOpenMaster_obj201A, 2},  /* photometer_ch0 */
-    {17, &CanOpenMaster_obj201B, 2},  /* photometer_ch1 */
+    {3, &CanOpenMaster_obj2001, 1},   /* reg 4  mX_modes */
+    {4, &CanOpenMaster_obj2005, 2},   /* reg 5  mX_control_word */
+    {27, &CanOpenMaster_obj2004, 2},  /* reg 28 mX_status_word */
+    {152, &CanOpenMaster_obj2003, 4}, /* reg 153 mX_velocity */
+    {163, &CanOpenMaster_obj2002, 4}, /* reg 164 mX_position */
+    {15, &CanOpenMaster_obj201A, 2},  /* reg 16 photometer_ch0 */
+    {16, &CanOpenMaster_obj201B, 2},  /* reg 17 photometer_ch1 */
 };
 #define NROUTES (sizeof(routes)/sizeof(routes[0]))
 
@@ -47,7 +47,7 @@ static void mb_write_od(uint16_t mb_addr, uint16_t val) {
             if (routes[i].size == 1)       *(uint8_t*)routes[i].var  = (uint8_t)val;
             else if (routes[i].size == 2)  *(uint16_t*)routes[i].var = val;
             else if (routes[i].size == 4)  *(uint32_t*)routes[i].var = val;
-            rt_kprintf("[OD] reg%d=%d (0x%04X)\n", mb_addr, val, val);
+            rt_kprintf("[OD] reg%d=%d\n", mb_addr + 1, val);
             return;
         }
     }
