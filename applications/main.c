@@ -6,6 +6,7 @@
 #include <rtthread.h>
 #include <string.h>
 #include "canopen_master.h"
+#include "pdo.h"
 
 #define POLY 0xA001
 #define SLAVE 1
@@ -48,6 +49,7 @@ static void mb_write_od(uint16_t mb_addr, uint16_t val) {
             else if (routes[i].size == 2)  *(uint16_t*)routes[i].var = val;
             else if (routes[i].size == 4)  *(uint32_t*)routes[i].var = val;
             rt_kprintf("[OD] reg%d=%d\n", mb_addr + 1, val);
+            sendPDOevent(&CanOpenMaster_Data);
             return;
         }
     }
