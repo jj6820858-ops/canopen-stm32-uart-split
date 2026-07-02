@@ -6,6 +6,7 @@
 #include <rtthread.h>
 #include <string.h>
 #include "canopen_master.h"
+#include "reg_router.h"
 
 #define POLY 0xA001
 #define SLAVE 1

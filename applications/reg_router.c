@@ -1,6 +1,6 @@
 /*
  * reg_router.c — Modbus → CANopen direct variable access
- * Variables: CanOpenMaster_objXXXX (hand-written ObjDict.c)
+ * Variables declared in ObjDict.h (objdictgen-generated Master.c)
  */
 #include "reg_router.h"
 #include <rtthread.h>
@@ -11,29 +11,7 @@
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
-/* ── Extern variables from ObjDict.c ── */
-extern UNS8  mX_modes; extern UNS32 mX_position;
-extern UNS32 mX_velocity; extern UNS16 mX_status_word;
-extern UNS16 mX_control_word; extern UNS8  mY_modes;
-extern UNS32 mY_position; extern UNS32 mY_velocity;
-extern UNS16 mY_status_word; extern UNS16 mY_control_word;
-extern UNS8  mZ_modes; extern UNS32 mZ_position;
-extern UNS32 mZ_velocity; extern UNS16 mZ_status_word;
-extern UNS16 mZ_control_word; extern UNS8  mE_modes;
-extern UNS32 mE_position; extern UNS32 mE_velocity;
-extern UNS16 mE_status_word; extern UNS16 mE_control_word;
-extern UNS8  mT_modes; extern UNS32 mT_position;
-extern UNS32 mT_velocity; extern UNS16 mT_status_word;
-extern UNS16 mT_control_word; extern UNS16 photometer_ch0;
-extern UNS16 photometer_ch1; extern UNS32 photometer_led;
-extern UNS32 TEMP_control_word; extern UNS32 heating_target;
-extern UNS32 refrigeration_target; extern UNS32 current_heating;
-extern UNS32 current_refrigeration; extern UNS16 photometer_rate;
-extern UNS8  photometer_gain; extern UNS32 TEMP_status_word;
-extern UNS32 weight_clean_water; extern UNS32 weight_buff_liq;
-extern UNS32 weight_waste_liq; extern UNS16 mX_Current_actual;
-extern UNS16 mY_Current_actual; extern UNS16 mZ_Current_actual;
-extern UNS16 mB_Current_actual;
+/* Extern variables from ObjDict.h (included via canopen_master.h) */
 
 typedef struct { uint16_t s,e; void *v; uint8_t z,a; } vr_t;
 static const vr_t g_routes[] = {
