@@ -15,6 +15,6 @@
 int canopen_master_init(void);
 
 /* External: CANopen master data (for SDO operations) */
-extern CO_Data CanOpenMaster_Data;
+extern CO_Data Master_Data;
 
 #endif /* __CANOPEN_MASTER_H__ */

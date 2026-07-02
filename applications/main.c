@@ -12,14 +12,14 @@
 #define REGS 200
 static uint16_t regs[REGS] = {0};
 
-/* ObjDict variables (PDO映射对象, 赋值后PDO引擎自动发送) */
-extern UNS8  CanOpenMaster_obj2001; /* mX_modes          reg4  */
-extern UNS32 CanOpenMaster_obj2002; /* mX_position       reg164 */
-extern UNS32 CanOpenMaster_obj2003; /* mX_velocity       reg153 */
-extern UNS16 CanOpenMaster_obj2004; /* mX_status_word    reg28  */
-extern UNS16 CanOpenMaster_obj2005; /* mX_control_word   reg5   */
-extern UNS16 CanOpenMaster_obj201A; /* photometer_ch0    reg16  */
-extern UNS16 CanOpenMaster_obj201B; /* photometer_ch1    reg17  */
+/* ObjDict variables from generated Master.c (mX_modes etc.) */
+extern INTEGER8  mX_modes;
+extern INTEGER32 mX_position;
+extern INTEGER32 mX_velocity;
+extern UNS16     mX_status_word;
+extern UNS16     mX_control_word;
+extern UNS16     photometer_ch0;
+extern UNS16     photometer_ch1;
 
 static uint16_t crc16(uint8_t *d, int len) {
     uint16_t c = 0xFFFF;
@@ -31,13 +31,13 @@ static uint16_t crc16(uint8_t *d, int len) {
 /* 路由表: Modbus地址→OD变量 */
 typedef struct { uint16_t addr; void *var; int size; } mb_route_t;
 static const mb_route_t routes[] = {
-    {3, &CanOpenMaster_obj2001, 1},   /* reg 4  mX_modes */
-    {4, &CanOpenMaster_obj2005, 2},   /* reg 5  mX_control_word */
-    {27, &CanOpenMaster_obj2004, 2},  /* reg 28 mX_status_word */
-    {152, &CanOpenMaster_obj2003, 4}, /* reg 153 mX_velocity */
-    {163, &CanOpenMaster_obj2002, 4}, /* reg 164 mX_position */
-    {15, &CanOpenMaster_obj201A, 2},  /* reg 16 photometer_ch0 */
-    {16, &CanOpenMaster_obj201B, 2},  /* reg 17 photometer_ch1 */
+    {3, &mX_modes, 1},          /* reg 4 */
+    {4, &mX_control_word, 2},   /* reg 5 */
+    {27, &mX_status_word, 2},   /* reg 28 */
+    {152, &mX_velocity, 4},     /* reg 153 */
+    {163, &mX_position, 4},     /* reg 164 */
+    {15, &photometer_ch0, 2},   /* reg 16 */
+    {16, &photometer_ch1, 2},   /* reg 17 */
 };
 #define NROUTES (sizeof(routes)/sizeof(routes[0]))
 

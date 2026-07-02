@@ -74,9 +74,9 @@ static void ConfigureSlaveNode(CO_Data *d, UNS8 nodeId)
 
 /* ── State transition callbacks ────────────────── */
 /* Direct access to SDO client OD variables (defined in ObjDict.c) */
-extern UNS32 CanOpenMaster_obj1280_COB_ID_Client_to_Server_Transmit_SDO;
-extern UNS32 CanOpenMaster_obj1280_COB_ID_Server_to_Client_Receive_SDO;
-extern UNS8  CanOpenMaster_obj1280_Node_ID_of_the_SDO_Server;
+extern UNS32 Master_obj1280_COB_ID_Client_to_Server_Transmit_SDO;
+extern UNS32 Master_obj1280_COB_ID_Server_to_Client_Receive_SDO;
+extern UNS8  Master_obj1280_Node_ID_of_the_SDO_Server;
 
 void TestMaster_initialisation(CO_Data *d)
 {
@@ -93,14 +93,14 @@ void TestMaster_initialisation(CO_Data *d)
     /* Directly patch SDO client OD for slave node (writeLocalDict doesn't
      * persist because CANfestival resets OD entries during state transition).
      * This makes GetSDOClientFromNodeId() find the correct slave node. */
-    CanOpenMaster_obj1280_COB_ID_Client_to_Server_Transmit_SDO = 0x600 + SLAVE_NODE_ID;
-    CanOpenMaster_obj1280_COB_ID_Server_to_Client_Receive_SDO  = 0x580 + SLAVE_NODE_ID;
-    CanOpenMaster_obj1280_Node_ID_of_the_SDO_Server            = SLAVE_NODE_ID;
+    Master_obj1280_COB_ID_Client_to_Server_Transmit_SDO = 0x600 + SLAVE_NODE_ID;
+    Master_obj1280_COB_ID_Server_to_Client_Receive_SDO  = 0x580 + SLAVE_NODE_ID;
+    Master_obj1280_Node_ID_of_the_SDO_Server            = SLAVE_NODE_ID;
 
     LOG_I("SDO client patched: node=0x%02X, TX=0x%04lX, RX=0x%04lX",
           SLAVE_NODE_ID,
-          (unsigned long)CanOpenMaster_obj1280_COB_ID_Client_to_Server_Transmit_SDO,
-          (unsigned long)CanOpenMaster_obj1280_COB_ID_Server_to_Client_Receive_SDO);
+          (unsigned long)Master_obj1280_COB_ID_Client_to_Server_Transmit_SDO,
+          (unsigned long)Master_obj1280_COB_ID_Server_to_Client_Receive_SDO);
 }
 
 void TestMaster_preOperational(CO_Data *d)
@@ -147,8 +147,8 @@ void TestMaster_post_SlaveBootup(CO_Data *d, UNS8 nodeId)
 static void InitNodes(CO_Data *d, UNS32 id)
 {
     (void)id;
-    setNodeId(&CanOpenMaster_Data, 0x00);
-    setState(&CanOpenMaster_Data, Initialisation);
+    setNodeId(&Master_Data, 0x00);
+    setState(&Master_Data, Initialisation);
 }
 
 int canopen_master_init(void)
@@ -159,20 +159,20 @@ int canopen_master_init(void)
     can_hardware_init();
 
     /* 2. Set CANopen state callbacks */
-    CanOpenMaster_Data.initialisation   = TestMaster_initialisation;
-    CanOpenMaster_Data.preOperational   = TestMaster_preOperational;
-    CanOpenMaster_Data.operational      = TestMaster_operational;
-    CanOpenMaster_Data.stopped          = TestMaster_stopped;
-    CanOpenMaster_Data.post_sync        = TestMaster_post_sync;
-    CanOpenMaster_Data.post_TPDO        = TestMaster_post_TPDO;
-    CanOpenMaster_Data.heartbeatError   = TestMaster_heartbeatError;
-    CanOpenMaster_Data.post_SlaveBootup = TestMaster_post_SlaveBootup;
+    Master_Data.initialisation   = TestMaster_initialisation;
+    Master_Data.preOperational   = TestMaster_preOperational;
+    Master_Data.operational      = TestMaster_operational;
+    Master_Data.stopped          = TestMaster_stopped;
+    Master_Data.post_sync        = TestMaster_post_sync;
+    Master_Data.post_TPDO        = TestMaster_post_TPDO;
+    Master_Data.heartbeatError   = TestMaster_heartbeatError;
+    Master_Data.post_SlaveBootup = TestMaster_post_SlaveBootup;
 
     /* 3. Start CANopen timer loop (periodic TimeDispatch) */
     StartTimerLoop(NULL);
 
     /* 4. Init CANopen node once */
-    InitNodes(&CanOpenMaster_Data, 0);
+    InitNodes(&Master_Data, 0);
 
     LOG_I("CANopen master started (Node ID=0x00, Slave=0x%02X)", SLAVE_NODE_ID);
     return 0;

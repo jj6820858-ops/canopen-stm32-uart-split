@@ -7,8 +7,8 @@
 #include "timers.h"              /* for TimeDispatch() */
 #include "can_driver.h"          /* for canReceive() */
 #include "states.h"              /* for canDispatch() */
-/* CanOpenMaster_Data is declared in applications/canopen_master.h */
-extern CO_Data CanOpenMaster_Data;
+/* Master_Data is declared in applications/canopen_master.h */
+extern CO_Data Master_Data;
 
 static rt_timer_t g_timer = RT_NULL;
 static rt_thread_t g_timer_thread = RT_NULL;
@@ -68,7 +68,7 @@ void LeaveMutex(void) { }
 static void timer_thread_entry(void *param)
 {
     (void)param;
-    CO_Data *d = &CanOpenMaster_Data;
+    CO_Data *d = &Master_Data;
     Message msg;
 
     while (1) {
