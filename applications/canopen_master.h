@@ -7,14 +7,14 @@
 #include "canfestival/port/timer_rtthread.h"
 #include "canfestival/od_master/ObjDict.h"
 
-#ifndef CONFIG_CANOPEN_SLAVE_NODE_ID
-#define CONFIG_CANOPEN_SLAVE_NODE_ID  0x01
-#endif
-#define SLAVE_NODE_ID  CONFIG_CANOPEN_SLAVE_NODE_ID
+/* Slave node IDs are configured in ObjDict.c (objdictgen-generated).
+   SDO channels 0x1280~0x1284 each carry their own Node_ID subindex.
+   PDO COB-IDs are hardcoded per-slave in the OD table.
+   Do NOT override at runtime — OD is the single source of truth. */
 
 int canopen_master_init(void);
 
-/* External: CANopen master data (for SDO operations) */
+/* External: CANopen master data */
 extern CO_Data Master_Data;
 
 #endif /* __CANOPEN_MASTER_H__ */

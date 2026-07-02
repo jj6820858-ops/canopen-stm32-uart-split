@@ -7,6 +7,7 @@
 #include "timers.h"              /* for TimeDispatch() */
 #include "can_driver.h"          /* for canReceive() */
 #include "states.h"              /* for canDispatch() */
+#include "pdo.h"                 /* for sendPDOevent() */
 /* Master_Data is declared in applications/canopen_master.h */
 extern CO_Data Master_Data;
 
@@ -76,6 +77,8 @@ static void timer_thread_entry(void *param)
         while (canReceive((CAN_HANDLE)1, &msg)) {
             canDispatch(d, &msg);
         }
+        /* Fire event-driven TPDOs (type 0xFE/0xFF) on OD variable change */
+        sendPDOevent(d);
         rt_thread_mdelay(5);
     }
 }

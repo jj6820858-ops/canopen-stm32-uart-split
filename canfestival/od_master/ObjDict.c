@@ -993,8 +993,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
                     UNS8 Master_highestSubIndex_obj1A01 = 2; /* number of subindex - 1*/
                     UNS32 Master_obj1A01[] = 
                     {
-                      0x20020020,	/* mX_position */
-                      0x20030020	/* mX_velocity */
+                      0x20020020,	/* 537002016 */
+                      0x20030020	/* 537067552 */
                     };
                     subindex Master_Index1A01[] = 
                      {
@@ -1425,7 +1425,6 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
                        { RW, int16, sizeof (INTEGER16), (void*)&mB_Current_actual }
                      };
 
-
 /**************************************************************************/
 /* Declaration of pointed variables                                       */
 /**************************************************************************/
@@ -1643,7 +1642,7 @@ const indextable * Master_scanIndexOD (UNS16 wIndex, UNS32 * errorCode, ODCallba
 		case 0x2029: i = 99;break;
 		case 0x202A: i = 100;break;
 		case 0x202B: i = 101;break;
-				default:
+		default:
 			*errorCode = OD_NO_SUCH_OBJECT;
 			return NULL;
 	}
