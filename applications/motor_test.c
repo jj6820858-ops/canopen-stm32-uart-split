@@ -7,21 +7,12 @@
  *   motor_mode <mode>       — set mX_modes    (OD 0x2001)
  *   motor_ctrl <ctrl_word>  — set mX_control_word (OD 0x2005)
  *   motor_stat              — read all X-axis OD variables
- *
- * Data flow:
- *   finsh cmd → writeLocalDict() → OD variable → TPDO2 (event, 21ms)
- *   → CAN bus (COB-ID 0x301) → slave RPDO → motor moves
- *
- * TPDO2 mapping (from ObjDict.c):
- *   0x1A01 / 0x1801: mX_position (0x2002) + mX_velocity (0x2003)
- *   COB-ID: 0x301, Type: 0xFF (event-driven), Event Timer: 21ms
  */
 
 #include <rtthread.h>
 #include <stdlib.h>
 #include "canopen_master.h"
-
-/* ── OD variables (declared in ObjDict.h, included via canopen_master.h) ── */
+#include "pdo.h"                 /* sendPDOevent() */
 
 static int motor_pos(int argc, char **argv)
 {
@@ -33,7 +24,8 @@ static int motor_pos(int argc, char **argv)
     INTEGER32 val = (INTEGER32)atol(argv[1]);
     UNS32 size = sizeof(INTEGER32);
     writeLocalDict(&Master_Data, 0x2002, 0x00, &val, &size, RW);
-    rt_kprintf("  mX_position (0x2002) ← %ld  [TPDO2 will fire within 21ms]\n", (long)val);
+    sendPDOevent(&Master_Data);
+    rt_kprintf("  mX_position (0x2002) = %ld\n", (long)val);
     return 0;
 }
 MSH_CMD_EXPORT(motor_pos, set X motor target position (OD 0x2002));
@@ -48,7 +40,8 @@ static int motor_vel(int argc, char **argv)
     INTEGER32 val = (INTEGER32)atol(argv[1]);
     UNS32 size = sizeof(INTEGER32);
     writeLocalDict(&Master_Data, 0x2003, 0x00, &val, &size, RW);
-    rt_kprintf("  mX_velocity (0x2003) ← %ld  [TPDO2 will fire within 21ms]\n", (long)val);
+    sendPDOevent(&Master_Data);
+    rt_kprintf("  mX_velocity (0x2003) = %ld\n", (long)val);
     return 0;
 }
 MSH_CMD_EXPORT(motor_vel, set X motor velocity (OD 0x2003));
@@ -64,7 +57,8 @@ static int motor_mode(int argc, char **argv)
     INTEGER8 val = (INTEGER8)atoi(argv[1]);
     UNS32 size = sizeof(INTEGER8);
     writeLocalDict(&Master_Data, 0x2001, 0x00, &val, &size, RW);
-    rt_kprintf("  mX_modes (0x2001) ← %d\n", (int)val);
+    sendPDOevent(&Master_Data);
+    rt_kprintf("  mX_modes (0x2001) = %d\n", (int)val);
     return 0;
 }
 MSH_CMD_EXPORT(motor_mode, set X motor op mode (OD 0x2001));
@@ -80,7 +74,8 @@ static int motor_ctrl(int argc, char **argv)
     UNS16 val = (UNS16)strtoul(argv[1], NULL, 0);
     UNS32 size = sizeof(UNS16);
     writeLocalDict(&Master_Data, 0x2005, 0x00, &val, &size, RW);
-    rt_kprintf("  mX_control_word (0x2005) ← 0x%04X\n", (unsigned)val);
+    sendPDOevent(&Master_Data);
+    rt_kprintf("  mX_control_word (0x2005) = 0x%04X\n", (unsigned)val);
     return 0;
 }
 MSH_CMD_EXPORT(motor_ctrl, set X motor control word (OD 0x2005));
@@ -88,14 +83,14 @@ MSH_CMD_EXPORT(motor_ctrl, set X motor control word (OD 0x2005));
 static int motor_stat(int argc, char **argv)
 {
     (void)argc; (void)argv;
-    rt_kprintf("──── X-axis Motor Status ────\n");
+    rt_kprintf("---- X-axis Motor Status ----\n");
     rt_kprintf("  mX_modes        (0x2001) = %d\n", (int)mX_modes);
     rt_kprintf("  mX_position     (0x2002) = %ld\n", (long)mX_position);
     rt_kprintf("  mX_velocity     (0x2003) = %ld\n", (long)mX_velocity);
     rt_kprintf("  mX_status_word  (0x2004) = 0x%04X\n", (unsigned)mX_status_word);
     rt_kprintf("  mX_control_word (0x2005) = 0x%04X\n", (unsigned)mX_control_word);
     rt_kprintf("  mX_Current_actual(0x2028)= %d\n", (int)mX_Current_actual);
-    rt_kprintf("────────────────────────────\n");
+    rt_kprintf("----------------------------\n");
     return 0;
 }
 MSH_CMD_EXPORT(motor_stat, read all X motor OD variables);

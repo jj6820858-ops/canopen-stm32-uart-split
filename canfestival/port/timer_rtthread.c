@@ -72,13 +72,21 @@ static void timer_thread_entry(void *param)
     CO_Data *d = &Master_Data;
     Message msg;
 
+    int loop_cnt = 0;
     while (1) {
         /* Process CAN receive frames */
         while (canReceive((CAN_HANDLE)1, &msg)) {
             canDispatch(d, &msg);
         }
+        /* Ensure PDOs are enabled */
+        if (!d->CurrentCommunicationState.csPDO) {
+            d->CurrentCommunicationState.csPDO = 1;
+            rt_kprintf("[PDO] csPDO was 0, forcing to 1\n");
+        }
         /* Fire event-driven TPDOs (type 0xFE/0xFF) on OD variable change */
-        sendPDOevent(d);
+        UNS8 sent = sendPDOevent(d);
+        if (++loop_cnt % 1000 == 0)
+            rt_kprintf("[PDO] loop #%d, sent=%d, csPDO=%d\n", loop_cnt, sent, d->CurrentCommunicationState.csPDO);
         rt_thread_mdelay(5);
     }
 }

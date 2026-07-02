@@ -5,10 +5,23 @@
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
 
+/* Directly accessed by CANfestival via CO_Data struct pointers */
+extern UNS16 Master_obj1017;
+extern UNS8  Master_highestSubIndex_obj1016;
+extern UNS32 Master_obj1016[];
+
 void TestMaster_initialisation(CO_Data *d)
 {
+    /* Enable master heartbeat: 1000ms on COB-ID 0x700 */
+    Master_obj1017 = 1000;
+
+    /* Monitor slave node 1 heartbeat (3s timeout) */
+    Master_highestSubIndex_obj1016 = 1;
+    Master_obj1016[0] = 0x00010BB8;  /* node=1, timeout=3000ms */
+
+    LOG_I("Master: initialisation — heartbeat 1s, monitoring slave node 1");
+    LOG_I("  COB-ID: 0x700 (master) / 0x701 (slave)");
     (void)d;
-    LOG_I("Master: initialisation — OD config loaded (no runtime patching)");
 }
 
 void TestMaster_preOperational(CO_Data *d)

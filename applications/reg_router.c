@@ -47,8 +47,9 @@ static const od_sync_t od_sync[] = {
     {  4, &mX_control_word,   2 },  /* 00005  取液/注液/清洗 */
     {  5, &mX_position,       4 },  /* 00006~00007  柱塞泵液量 */
 
+    /* ── X轴速度: 蠕动泵转速 ── */
+    {  7, &mX_velocity,       4 },  /* 00008  蠕动泵转速 → mX_velocity */
     /* ── Y轴: 蠕动泵 ── */
-    {  7, &mY_velocity,       4 },  /* 00008  蠕动泵转速 */
     {  8, &mY_position,       4 },  /* 00009  蠕动泵圈数 */
 
     /* ── T轴: 转盘 (TPDO5 mapped) ── */
@@ -202,8 +203,8 @@ static void od_to_regs(const od_sync_t *s)
         break;
     case 4:
         v32 = *(UNS32*)s->od_var;
-        regs[s->reg_addr]     = (UNS16)(v32 & 0xFFFF);
-        regs[s->reg_addr + 1] = (UNS16)(v32 >> 16);
+        regs[s->reg_addr]     = (UNS16)(v32 >> 16);       /* hi 16 */
+        regs[s->reg_addr + 1] = (UNS16)(v32 & 0xFFFF);    /* lo 16 */
         break;
     }
 }
@@ -220,7 +221,7 @@ static void regs_to_od(const od_sync_t *s)
         *(UNS16*)s->od_var = regs[s->reg_addr];
         break;
     case 4:
-        v32 = regs[s->reg_addr] | ((uint32_t)regs[s->reg_addr + 1] << 16);
+        v32 = ((uint32_t)regs[s->reg_addr] << 16) | regs[s->reg_addr + 1];
         *(UNS32*)s->od_var = v32;
         break;
     }
@@ -344,7 +345,7 @@ static int reg(int argc, char **argv)
     rt_kprintf("[%05d] %s = 0x%04X (%d)",
                rn, def ? def->name : "?", regs[a], regs[a]);
     if (s) {
-        rt_kprintf("  ← OD synced (%d bytes)", s->od_bytes);
+        rt_kprintf("  OD synced (%d bytes)", s->od_bytes);
     }
     rt_kprintf("\n");
     return 0;

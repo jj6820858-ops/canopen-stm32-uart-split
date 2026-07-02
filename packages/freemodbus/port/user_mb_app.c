@@ -65,11 +65,10 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
 
     switch (eMode) {
     case MB_REG_READ: {
-        /* Try CANopen local OD first (reg_router), fall back to local buffer */
         USHORT i;
-        int ret = reg_read(usAddress + 1, usNRegs, pucRegBuffer);
+        int ret = reg_read(usAddress, usNRegs, pucRegBuffer);
         if (ret >= 0) {
-            LOG_D("RD addr=%d cnt=%d (local OD OK %dB)", usAddress + 1, usNRegs, ret);
+            LOG_D("RD addr=%d cnt=%d (OD sync %dB)", usAddress + 1, usNRegs, ret);
             break;
         }
         /* Fallback: read from local buffer */
@@ -78,15 +77,10 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
             pucRegBuffer[i * 2]     = (UCHAR)(usSRegHoldBuf[usAddress + i] >> 8);
             pucRegBuffer[i * 2 + 1] = (UCHAR)(usSRegHoldBuf[usAddress + i] & 0xFF);
         }
-        /* Print values for debugging */
-        for (i = 0; i < usNRegs && i < 8; i++) {
-            LOG_D("  [%d] = 0x%04X", usAddress + 1 + i, usSRegHoldBuf[usAddress + i]);
-        }
         break;
     }
 
     case MB_REG_WRITE: {
-        /* Write to local buffer (immediate) */
         USHORT i;
         uint8_t *pSrc = pucRegBuffer;
         LOG_I("WR addr=%d n=%d", usAddress + 1, usNRegs);
@@ -94,9 +88,9 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
             usSRegHoldBuf[usAddress + i] = (pSrc[0] << 8) | pSrc[1];
             pSrc += 2;
         }
-        /* Sync to CANopen local OD (non-blocking) */
-        if (reg_write_async(usAddress + 1, usNRegs, pucRegBuffer, NULL) != 0) {
-            LOG_W("CANopen local OD write failed");
+        /* Sync to CANopen OD (non-blocking) */
+        if (reg_write_async(usAddress, usNRegs, pucRegBuffer, NULL) != 0) {
+            LOG_W("CANopen OD write failed");
         }
         break;
     }
