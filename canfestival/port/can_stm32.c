@@ -93,14 +93,10 @@ void can_hardware_init(void)
 
     hcan1.Instance = CAN1;
     can_set_baudrate("250K");
-    rt_kprintf("[CAN] HAL_CAN_Init (250Kbps, SJW=2TQ, BS1=11TQ, BS2=4TQ): state=%lu\n",
-               (unsigned long)hcan1.State);
     if (HAL_CAN_Init(&hcan1) != HAL_OK) {
-        rt_kprintf("[CAN] HAL_CAN_Init FAILED! ErrorCode=0x%08lx\n",
-                   (unsigned long)hcan1.ErrorCode);
+        rt_kprintf("[CAN] Init FAILED! ErrorCode=0x%08lx\n", (unsigned long)hcan1.ErrorCode);
         return;
     }
-    rt_kprintf("[CAN] HAL_CAN_Init OK, state=%lu\n", (unsigned long)hcan1.State);
 
     /* Configure filter 1: ID mask mode, 32-bit, accept all (CANopen master).
      * FilterBank 1 (STM32F103 has filters 0-13 for CAN1).
@@ -118,13 +114,10 @@ void can_hardware_init(void)
     filter.SlaveStartFilterBank = 14;
     HAL_CAN_ConfigFilter(&hcan1, &filter);
 
-    rt_kprintf("[CAN] HAL_CAN_Start: state=%lu\n", (unsigned long)hcan1.State);
     if (HAL_CAN_Start(&hcan1) != HAL_OK) {
-        rt_kprintf("[CAN] HAL_CAN_Start FAILED! ErrorCode=0x%08lx\n",
-                   (unsigned long)hcan1.ErrorCode);
+        rt_kprintf("[CAN] Start FAILED! ErrorCode=0x%08lx\n", (unsigned long)hcan1.ErrorCode);
         return;
     }
-    rt_kprintf("[CAN] HAL_CAN_Start OK, state=%lu\n", (unsigned long)hcan1.State);
     HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
     /* Enable CAN RX interrupt in NVIC */
@@ -144,11 +137,6 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
     msg.cob_id = rx_header.StdId;
     msg.len = rx_header.DLC;
     msg.rtr = (rx_header.RTR == CAN_RTR_REMOTE) ? 1 : 0;
-
-    rt_kprintf("[CAN_RX] ID=0x%03X DLC=%d DATA=%02X %02X %02X %02X %02X %02X %02X %02X\n",
-               msg.cob_id, msg.len,
-               msg.data[0], msg.data[1], msg.data[2], msg.data[3],
-               msg.data[4], msg.data[5], msg.data[6], msg.data[7]);
 
     if (rx_count < CAN_RX_BUF_SIZE) {
         rx_buf[rx_head] = msg;
@@ -193,7 +181,6 @@ UNS8 canSend(CAN_HANDLE fd, Message const *m)
                              &tx_mailbox) != HAL_OK) {
         /* Attempt Bus-Off recovery */
         if (__HAL_CAN_GET_FLAG(&hcan1, CAN_FLAG_BOF)) {
-            rt_kprintf("[CAN] Bus-Off detected in canSend, recovering...\n");
             HAL_CAN_Stop(&hcan1);
             CAN_FilterTypeDef filter = {0};
             filter.FilterBank = 1;
