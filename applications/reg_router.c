@@ -12,74 +12,74 @@
 #include <rtdbg.h>
 
 /* ── Extern variables from ObjDict.c ── */
-extern UNS8  CanOpenMaster_obj2001; extern UNS32 CanOpenMaster_obj2002;
-extern UNS32 CanOpenMaster_obj2003; extern UNS16 CanOpenMaster_obj2004;
-extern UNS16 CanOpenMaster_obj2005; extern UNS8  CanOpenMaster_obj2006;
-extern UNS32 CanOpenMaster_obj2007; extern UNS32 CanOpenMaster_obj2008;
-extern UNS16 CanOpenMaster_obj2009; extern UNS16 CanOpenMaster_obj200A;
-extern UNS8  CanOpenMaster_obj200B; extern UNS32 CanOpenMaster_obj200C;
-extern UNS32 CanOpenMaster_obj200D; extern UNS16 CanOpenMaster_obj200E;
-extern UNS16 CanOpenMaster_obj200F; extern UNS8  CanOpenMaster_obj2010;
-extern UNS32 CanOpenMaster_obj2011; extern UNS32 CanOpenMaster_obj2012;
-extern UNS16 CanOpenMaster_obj2013; extern UNS16 CanOpenMaster_obj2014;
-extern UNS8  CanOpenMaster_obj2015; extern UNS32 CanOpenMaster_obj2016;
-extern UNS32 CanOpenMaster_obj2017; extern UNS16 CanOpenMaster_obj2018;
-extern UNS16 CanOpenMaster_obj2019; extern UNS16 CanOpenMaster_obj201A;
-extern UNS16 CanOpenMaster_obj201B; extern UNS32 CanOpenMaster_obj201C;
-extern UNS32 CanOpenMaster_obj201D; extern UNS32 CanOpenMaster_obj201E;
-extern UNS32 CanOpenMaster_obj201F; extern UNS32 CanOpenMaster_obj2020;
-extern UNS32 CanOpenMaster_obj2021; extern UNS16 CanOpenMaster_obj2022;
-extern UNS8  CanOpenMaster_obj2023; extern UNS32 CanOpenMaster_obj2024;
-extern UNS32 CanOpenMaster_obj2025; extern UNS32 CanOpenMaster_obj2026;
-extern UNS32 CanOpenMaster_obj2027; extern UNS16 CanOpenMaster_obj2028;
-extern UNS16 CanOpenMaster_obj2029; extern UNS16 CanOpenMaster_obj202A;
-extern UNS16 CanOpenMaster_obj202B;
+extern UNS8  mX_modes; extern UNS32 mX_position;
+extern UNS32 mX_velocity; extern UNS16 mX_status_word;
+extern UNS16 mX_control_word; extern UNS8  mY_modes;
+extern UNS32 mY_position; extern UNS32 mY_velocity;
+extern UNS16 mY_status_word; extern UNS16 mY_control_word;
+extern UNS8  mZ_modes; extern UNS32 mZ_position;
+extern UNS32 mZ_velocity; extern UNS16 mZ_status_word;
+extern UNS16 mZ_control_word; extern UNS8  mE_modes;
+extern UNS32 mE_position; extern UNS32 mE_velocity;
+extern UNS16 mE_status_word; extern UNS16 mE_control_word;
+extern UNS8  mT_modes; extern UNS32 mT_position;
+extern UNS32 mT_velocity; extern UNS16 mT_status_word;
+extern UNS16 mT_control_word; extern UNS16 photometer_ch0;
+extern UNS16 photometer_ch1; extern UNS32 photometer_led;
+extern UNS32 TEMP_control_word; extern UNS32 heating_target;
+extern UNS32 refrigeration_target; extern UNS32 current_heating;
+extern UNS32 current_refrigeration; extern UNS16 photometer_rate;
+extern UNS8  photometer_gain; extern UNS32 TEMP_status_word;
+extern UNS32 weight_clean_water; extern UNS32 weight_buff_liq;
+extern UNS32 weight_waste_liq; extern UNS16 mX_Current_actual;
+extern UNS16 mY_Current_actual; extern UNS16 mZ_Current_actual;
+extern UNS16 mB_Current_actual;
 
 typedef struct { uint16_t s,e; void *v; uint8_t z,a; } vr_t;
 static const vr_t g_routes[] = {
-    {0x0004,0x0004,&CanOpenMaster_obj2001, 1, REG_RW},
-    {0x0005,0x0005,&CanOpenMaster_obj2005, 2, REG_RW},
-    {0x001C,0x001C,&CanOpenMaster_obj2004, 2, REG_RO},
-    {0x0099,0x0099,&CanOpenMaster_obj2003, 2, REG_RW},
-    {0x00A4,0x00A5,&CanOpenMaster_obj2002, 4, REG_RW},
-    {0x00D2,0x00D2,&CanOpenMaster_obj2028, 2, REG_RO},
-    {0x000A,0x000A,&CanOpenMaster_obj2006, 1, REG_RW},
-    {0x001D,0x001D,&CanOpenMaster_obj200A, 2, REG_RW},
-    {0x0012,0x0012,&CanOpenMaster_obj2009, 2, REG_RO},
-    {0x009D,0x009D,&CanOpenMaster_obj2008, 2, REG_RW},
-    {0x00AC,0x00AD,&CanOpenMaster_obj2007, 4, REG_RW},
-    {0x00D3,0x00D3,&CanOpenMaster_obj2029, 2, REG_RO},
-    {0x000B,0x000B,&CanOpenMaster_obj200F, 2, REG_RW},
-    {0x000C,0x000D,&CanOpenMaster_obj200C, 4, REG_RW},
-    {0x00AE,0x00AE,&CanOpenMaster_obj200B, 1, REG_RW},
-    {0x009C,0x009C,&CanOpenMaster_obj200D, 2, REG_RW},
-    {0x00CB,0x00CB,&CanOpenMaster_obj200E, 2, REG_RO},
-    {0x00D4,0x00D4,&CanOpenMaster_obj202A, 2, REG_RO},
-    {0x0008,0x0008,&CanOpenMaster_obj2012, 2, REG_RW},
-    {0x0009,0x0009,&CanOpenMaster_obj2011, 2, REG_RW},
-    {0x000F,0x000F,&CanOpenMaster_obj2010, 1, REG_RW},
-    {0x0014,0x0014,&CanOpenMaster_obj2013, 2, REG_RO},
-    {0x009F,0x009F,&CanOpenMaster_obj2014, 2, REG_RW},
-    {0x0006,0x0007,&CanOpenMaster_obj2016, 4, REG_RW},
-    {0x0078,0x0078,&CanOpenMaster_obj2015, 1, REG_RW},
-    {0x0015,0x0015,&CanOpenMaster_obj2018, 2, REG_RO},
-    {0x00A3,0x00A3,&CanOpenMaster_obj2017, 2, REG_RW},
-    {0x00CC,0x00CC,&CanOpenMaster_obj2019, 2, REG_RW},
-    {0x0010,0x0010,&CanOpenMaster_obj201A, 2, REG_RO},
-    {0x0011,0x0011,&CanOpenMaster_obj201B, 2, REG_RO},
-    {0x00C7,0x00C8,&CanOpenMaster_obj201C, 4, REG_RW},
-    {0x00C9,0x00C9,&CanOpenMaster_obj2022, 2, REG_RW},
-    {0x00CA,0x00CA,&CanOpenMaster_obj2023, 1, REG_RW},
-    {0x00D0,0x00D1,&CanOpenMaster_obj201D, 4, REG_RW},
-    {0x00C0,0x00C0,&CanOpenMaster_obj201E, 2, REG_RW},
-    {0x00C1,0x00C1,&CanOpenMaster_obj201F, 2, REG_RW},
-    {0x0064,0x0064,&CanOpenMaster_obj2020, 2, REG_RW},
-    {0x0065,0x0065,&CanOpenMaster_obj2021, 2, REG_RW},
-    {0x001F,0x001F,&CanOpenMaster_obj2024, 2, REG_RO},
-    {0x0066,0x0066,&CanOpenMaster_obj2025, 2, REG_RO},
-    {0x0067,0x0067,&CanOpenMaster_obj2026, 2, REG_RO},
-    {0x0068,0x0068,&CanOpenMaster_obj2027, 2, REG_RO},
-    {0x00D5,0x00D5,&CanOpenMaster_obj202B, 2, REG_RO},
+    {0x0004,0x0004,&mX_modes, 1, REG_RW},
+    {0x0005,0x0005,&mX_control_word, 2, REG_RW},
+    {0x001C,0x001C,&mX_status_word, 2, REG_RO},
+    {0x0099,0x0099,&mX_velocity, 2, REG_RW},
+    {0x00A4,0x00A5,&mX_position, 4, REG_RW},
+    {0x00D2,0x00D2,&mX_Current_actual, 2, REG_RO},
+    {0x000A,0x000A,&mY_modes, 1, REG_RW},
+    {0x001D,0x001D,&mY_control_word, 2, REG_RW},
+    {0x0012,0x0012,&mY_status_word, 2, REG_RO},
+    {0x009D,0x009D,&mY_velocity, 2, REG_RW},
+    {0x00AC,0x00AD,&mY_position, 4, REG_RW},
+    {0x00D3,0x00D3,&mY_Current_actual, 2, REG_RO},
+    {0x000B,0x000B,&mZ_control_word, 2, REG_RW},
+    {0x000C,0x000D,&mZ_position, 4, REG_RW},
+    {0x00AE,0x00AE,&mZ_modes, 1, REG_RW},
+    {0x009C,0x009C,&mZ_velocity, 2, REG_RW},
+    {0x00CB,0x00CB,&mZ_status_word, 2, REG_RO},
+    {0x00D4,0x00D4,&mZ_Current_actual, 2, REG_RO},
+    {0x0008,0x0008,&mE_velocity, 2, REG_RW},
+    {0x0009,0x0009,&mE_position, 2, REG_RW},
+    {0x000F,0x000F,&mE_modes, 1, REG_RW},
+    {0x0014,0x0014,&mE_status_word, 2, REG_RO},
+    {0x009F,0x009F,&mE_control_word, 2, REG_RW},
+    {0x0006,0x0007,&mT_position, 4, REG_RW},
+    {0x0078,0x0078,&mT_modes, 1, REG_RW},
+    {0x0015,0x0015,&mT_status_word, 2, REG_RO},
+    {0x00A3,0x00A3,&mT_velocity, 2, REG_RW},
+    {0x00CC,0x00CC,&mT_control_word, 2, REG_RW},
+    {0x0010,0x0010,&photometer_ch0, 2, REG_RO},
+    {0x0011,0x0011,&photometer_ch1, 2, REG_RO},
+    {0x00C7,0x00C8,&photometer_led, 4, REG_RW},
+    {0x00C9,0x00C9,&photometer_rate, 2, REG_RW},
+    {0x00CA,0x00CA,&photometer_gain, 1, REG_RW},
+    {0x00D0,0x00D1,&TEMP_control_word, 4, REG_RW},
+    {0x00C0,0x00C0,&heating_target, 2, REG_RW},
+    {0x00C1,0x00C1,&refrigeration_target, 2, REG_RW},
+    {0x0064,0x0064,&current_heating, 2, REG_RW},
+    {0x0065,0x0065,&current_refrigeration, 2, REG_RW},
+    {0x001F,0x001F,&TEMP_status_word, 2, REG_RO},
+    {0x0066,0x0066,&weight_clean_water, 2, REG_RO},
+    {0x0067,0x0067,&weight_buff_liq, 2, REG_RO},
+    {0x0068,0x0068,&weight_waste_liq, 2, REG_RO},
+    {0x00D5,0x00D5,&mB_Current_actual, 2, REG_RO},
     {0,0,NULL,0,0}};
 #define N ((sizeof(g_routes)/sizeof(g_routes[0]))-1)
 
