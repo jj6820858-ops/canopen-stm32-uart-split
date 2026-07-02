@@ -42,13 +42,18 @@ static const mb_route_t routes[] = {
 };
 #define NROUTES (sizeof(routes)/sizeof(routes[0]))
 
-static void mb_write_od(uint16_t mb_addr, uint16_t val) {
+static void mb_write_od(uint16_t mb_addr, uint32_t val) {
     for (int i = 0; i < NROUTES; i++) {
         if (routes[i].addr == mb_addr) {
             if (routes[i].size == 1)       *(uint8_t*)routes[i].var  = (uint8_t)val;
-            else if (routes[i].size == 2)  *(uint16_t*)routes[i].var = val;
+            else if (routes[i].size == 2)  *(uint16_t*)routes[i].var = (uint16_t)val;
             else if (routes[i].size == 4)  *(uint32_t*)routes[i].var = val;
-            rt_kprintf("[OD] reg%d=%d\n", mb_addr + 1, val);
+            rt_kprintf("[OD] reg%d=%d\n", mb_addr + 1, (int)val);
+            /* Also sync to CiA 402 objects for motor */
+            extern INTEGER32 Target_Position;
+            extern INTEGER32 Profile_Accel;
+            if (mb_addr == 163) Target_Position = val;  /* reg 164 → 0x607A */
+            if (mb_addr == 152) Profile_Accel  = val;   /* reg 153 → 0x6083 */
             return;
         }
     }

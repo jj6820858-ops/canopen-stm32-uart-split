@@ -49,6 +49,8 @@ INTEGER16 mX_Current_actual = 0x0;		/* Mapped at index 0x2028, subindex 0x00 */
 INTEGER16 mY_Current_actual = 0x0;		/* Mapped at index 0x2029, subindex 0x00 */
 INTEGER16 mZ_Current_actual = 0x0;		/* Mapped at index 0x202A, subindex 0x00 */
 INTEGER16 mB_Current_actual = 0x0;		/* Mapped at index 0x202B, subindex 0x00 */
+INTEGER32 Target_Position = 0x0;                /* CiA 402 0x607A */
+INTEGER32 Profile_Accel = 0x0;                  /* CiA 402 0x6083 */
 
 /**************************************************************************/
 /* Declaration of value range types                                       */
@@ -993,8 +995,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
                     UNS8 Master_highestSubIndex_obj1A01 = 2; /* number of subindex - 1*/
                     UNS32 Master_obj1A01[] = 
                     {
-                      0x20020020,	/* 537002016 */
-                      0x20030020	/* 537067552 */
+                      0x607A0020,	/* CiA 402 Target Position */
+                      0x60830020	/* CiA 402 Profile Acceleration */
                     };
                     subindex Master_Index1A01[] = 
                      {
@@ -1425,6 +1427,18 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
                        { RW, int16, sizeof (INTEGER16), (void*)&mB_Current_actual }
                      };
 
+/* index 0x607A :   Target Position (CiA 402) */
+                    subindex Master_Index607A[] =
+                     {
+                       { RW, int32, sizeof (INTEGER32), (void*)&Target_Position }
+                     };
+
+/* index 0x6083 :   Profile Acceleration (CiA 402) */
+                    subindex Master_Index6083[] =
+                     {
+                       { RW, int32, sizeof (INTEGER32), (void*)&Profile_Accel }
+                     };
+
 /**************************************************************************/
 /* Declaration of pointed variables                                       */
 /**************************************************************************/
@@ -1533,6 +1547,8 @@ const indextable Master_objdict[] =
   { (subindex*)Master_Index2029,sizeof(Master_Index2029)/sizeof(Master_Index2029[0]), 0x2029},
   { (subindex*)Master_Index202A,sizeof(Master_Index202A)/sizeof(Master_Index202A[0]), 0x202A},
   { (subindex*)Master_Index202B,sizeof(Master_Index202B)/sizeof(Master_Index202B[0]), 0x202B},
+  { (subindex*)Master_Index607A,sizeof(Master_Index607A)/sizeof(Master_Index607A[0]), 0x607A},
+  { (subindex*)Master_Index6083,sizeof(Master_Index6083)/sizeof(Master_Index6083[0]), 0x6083},
 };
 
 const indextable * Master_scanIndexOD (UNS16 wIndex, UNS32 * errorCode, ODCallback_t **callbacks)
@@ -1642,6 +1658,8 @@ const indextable * Master_scanIndexOD (UNS16 wIndex, UNS32 * errorCode, ODCallba
 		case 0x2029: i = 99;break;
 		case 0x202A: i = 100;break;
 		case 0x202B: i = 101;break;
+			case 0x607A: i = 102;break;
+			case 0x6083: i = 103;break;
 		default:
 			*errorCode = OD_NO_SUCH_OBJECT;
 			return NULL;
