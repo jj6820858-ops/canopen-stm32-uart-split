@@ -188,3 +188,8 @@ msh> can_test_start 200 # CAN 测试发送 (200ms间隔)
 | `C:\Users\lenovo\Desktop\快检设备交互协议20250609.xlsx` | Modbus 寄存器协议定义 |
 | `docs/2026-06-10-canopen-stm32-design.md` | 架构设计文档 |
 | `docs/2026-06-10-canopen-stm32-impl.md` | 实现计划 |
+| `docs/农药残留智能检测仪使用说明书.doc` | 仪器使用说明书（桂林品创科技） |
+| `docs/农药残留智能检测仪使用说明书.txt` | 说明书文本提取 |
+| `docs/快检设备交互协议20250609.xlsx` | Modbus 寄存器协议定义（80+寄存器） |
+| `canfestival/od_master/Master.c` | CANopen 主站对象字典源码 |
+| `canfestival/od_master/Master.h` | CANopen 主站对象字典头文件 |
