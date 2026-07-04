@@ -64,15 +64,17 @@ static const od_sync_t od_sync[] = {
     { 16, &photometer_ch1,    2 },  /* 00017  光强 ch1 (hi 16) */
 
     /* ── 实时数据 (RPDO7/RPDO8/RPDO9 mapped) ── */
-    { 99, &current_heating,     4 }, /* 0100  转盘加热温度 */
-    {100, &current_refrigeration,4 }, /* 0101  酶试剂制冷温度 */
+    { 99, &current_heating,     2 }, /* 0100  转盘加热温度 */
+    {100, &current_refrigeration,2 }, /* 0101  酶试剂制冷温度 */
     {101, &weight_clean_water,  4 }, /* 0102  清水瓶重量 */
     {102, &weight_buff_liq,     4 }, /* 0103  缓冲液瓶重量 */
     {103, &weight_waste_liq,    4 }, /* 0104  废液瓶重量 */
 
     /* ── 温度控制 (TPDO11/TPDO12 mapped) ── */
-    {191, &heating_target,       4 }, /* 0192~0193  转盘加热温度设定 */
-    {192, &refrigeration_target, 4 }, /* 0193 is in above... wait */
+    /* Modbus protocol each uses 1 register (2 bytes), OD stores as UNS32.
+       Use od_bytes=2 to avoid 4-byte overlap (addr 191-192 vs 192-193). */
+    {191, &heating_target,       2 }, /* 00192  加热目标温度 (×100,LE) */
+    {192, &refrigeration_target, 2 }, /* 00193  制冷目标温度 (×100,LE) */
 
     /* ── 升降臂: E轴 (TPDO3 mapped) ── */
     /* 0164~0171 depth values → mE_position, mE_velocity handled in app layer */
