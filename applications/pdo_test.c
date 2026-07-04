@@ -539,7 +539,7 @@ static int pdo_stat(int argc, char **argv)
     rt_kprintf("X    0x%04X           %-12d\n", (unsigned)mX_status_word, (int)mX_Current_actual);
     rt_kprintf("Y    0x%04X           %-12d\n", (unsigned)mY_status_word, (int)mY_Current_actual);
     rt_kprintf("Z    0x%04X           %-12d\n", (unsigned)mZ_status_word, (int)mZ_Current_actual);
-    rt_kprintf("E    0x%04X           %-12d\n", (unsigned)mE_status_word, (int)mE_Current_actual);
+    rt_kprintf("E    0x%04X           %-12d\n", (unsigned)mE_status_word, (int)mE_modes);
     rt_kprintf("T    0x%04X           %-12d\n", (unsigned)mT_status_word, (int)mT_modes);
     rt_kprintf("B    —                %-12d  (via RPDO4 with E)\n", (int)mB_Current_actual);
 
@@ -564,4 +564,4 @@ static int pdo_stat(int argc, char **argv)
     rt_kprintf("\n");
     return 0;
 }
-MSH_CMD_EXPORT(pdo_stat, dump ALL PDO status — axes, sensors, weights);
+MSH_CMD_EXPORT(pdo_stat, dump all PDO status axes sensors weights);

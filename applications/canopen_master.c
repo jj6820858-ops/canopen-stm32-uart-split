@@ -1,5 +1,6 @@
 #include "canopen_master.h"
 #include "reg_router.h"
+#include "sampling.h"
 
 #define DBG_TAG "canopen"
 #define DBG_LVL DBG_LOG
@@ -45,7 +46,8 @@ void TestMaster_stopped(CO_Data *d)
 void TestMaster_post_sync(CO_Data *d)
 {
     (void)d;
-    reg_od_sync_in();   /* Sync OD vars → Modbus regs (slave RPDO → master) */
+    reg_od_sync_in();            /* OD vars → Modbus regs */
+    sampling_sync_can_to_modbus();  /* CAN TPDO → hole encoding + sensors */
 }
 
 void TestMaster_post_TPDO(CO_Data *d)

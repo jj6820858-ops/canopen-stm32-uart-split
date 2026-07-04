@@ -19,6 +19,7 @@
  */
 
 #include "reg_router.h"
+#include "sampling.h"
 #include <rtthread.h>
 #include <string.h>
 #include "canopen_master.h"
@@ -290,6 +291,11 @@ int reg_write(uint16_t addr, uint8_t count, const uint8_t *data)
         const od_sync_t *s = od_sync_find(addr + i);
         if (s) regs_to_od(s);
     }
+    /* Notify sampling module of register writes */
+    for (uint8_t i = 0; i < count; i++) {
+        sampling_on_reg_write(addr + i, regs[addr + i]);
+    }
+
     LOG_D("reg_write addr=%d count=%d", addr, count);
     return 0;
 }
