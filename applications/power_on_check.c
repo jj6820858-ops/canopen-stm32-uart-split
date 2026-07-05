@@ -1,445 +1,466 @@
 /*
- * power_on_check.c — 上电校验序列（复现 CAN 采集数据）
+ * power_on_check.c — 上电校验 (匹配 上电校验4.csv)
  *
- * 完整复现 上电校验.csv 中的 24 秒上电流程:
- *
- *   COB-ID          帧数    用途
- *   ───────────────────────────────────────────
- *   0x000 (NMT)       3    启停控制
- *   0x301 (RPDO2 N1) 7677  电机A 位置=0x0001F4(500)
- *   0x302 (RPDO2 N2) 4541  电机B 位置=0x00014D55(85333)
- *   0x303 (RPDO2 N3) 4630  电机C 位置=ramp 变化
- *   0x304 (RPDO2 N4) 4546  电机D 位置=0xFFFF82FD(-32003)
- *   0x206 (RPDO1 N6) 1299  控制字 0x00→0x18
- *   0x601/581 (SDO)    15  Node1 参数
- *   0x602/582 (SDO)     2  Node2 参数
- *   0x603/583 (SDO)     5  Node3 参数
- *
- * OD 变量 → PDO 映射:
- *   mX_* → Node1  (0x301), mY_* → Node2 (0x302)
- *   mZ_* → Node3  (0x303), mE_* → Node4 (0x304)
- *   photometer_* → Node6 (0x206)
+ * 成品精确时序 (10ms/tick):
+ *   t=0ms:      NMT → Node 1,4,7
+ *   t=10ms:     SDO 链 (7个, ~0.35s完成)
+ *   t=10ms:     N3 0→780          @20/tick (0.36s)
+ *   t=380ms:    N3 780→-2660      @20/tick (1.7s)
+ *   t=2.0s:     N3 bounce→settle  @+20→-2
+ *   t=3.3s:     N1 start-315      @15/tick, N2 start-106 @10/tick
+ *   t=3.7s:     N1 reverse +15    @15/tick (过0), N2 reverse +10 @10/tick
+ *   t=5.5s:     N1 reverse -15    @15/tick, N2 micro -1  @1/tick
+ *   t=6.0s:     N1 micro +1       @1/tick
+ *   t=7.3s:     N4 → -32003       @30/tick
+ *   t=11.0s:    STOP → 全零
+ *   t=20.0s:    SDO restore N1=300
+ *   t=23.0s:    DONE
  */
 #include "power_on_check.h"
 #include "canopen_master.h"
-#include "reg_router.h"
 #include <rtthread.h>
 #include <string.h>
-
-/* CanFestival SDO/NMT API */
 #include "sdo.h"
 #include "nmtMaster.h"
 #include "pdo.h"
+#include "can_driver.h"           /* canSend() */
 
-/* OD variable externs (from ObjDict.h) */
-extern INTEGER32 mX_position;
-extern INTEGER32 mY_position;
-extern INTEGER32 mZ_position;
-extern INTEGER32 mE_position;
-extern INTEGER32 mT_position;
-extern INTEGER32 mX_velocity;
-extern INTEGER32 mY_velocity;
-extern INTEGER32 mZ_velocity;
-extern INTEGER32 mE_velocity;
-extern UNS16 mX_control_word;
-extern UNS16 mY_control_word;
-extern UNS16 mZ_control_word;
-extern UNS16 mE_control_word;
-extern UNS16 mT_control_word;
-extern INTEGER8 mX_modes;
-extern INTEGER8 mY_modes;
-extern INTEGER8 mZ_modes;
-extern INTEGER8 mE_modes;
-extern INTEGER8 mT_modes;
-extern UNS16 mX_status_word;
-extern UNS16 mY_status_word;
-extern UNS16 mZ_status_word;
-extern UNS16 mE_status_word;
-extern UNS16 mT_status_word;
-extern UNS16 photometer_ch0;
-extern UNS16 photometer_ch1;
+extern INTEGER32 mX_position, mY_position, mZ_position, mE_position;
+extern INTEGER32 mX_velocity, mY_velocity, mZ_velocity, mE_velocity;
+extern UNS16 photometer_ch0, photometer_ch1;
+extern UNS32 heating_target, refrigeration_target;
+extern INTEGER8 mT_modes;  /* 转盘功能使能 */
+extern UNS32 TEMP_control_word;  /* 温控控制字 */
 
 #define DBG_TAG "pwrchk"
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
 
-/* ═══════════════════════════════════════════════════════════════
- *  校验状态机
- * ═══════════════════════════════════════════════════════════════ */
+/* ── 运动参数 (10ms/tick, 精确匹配成品) ── */
+#define VELOCITY       0x0003E800   /* N1/N2/N3 velocity */
+#define N3_UP_STEP     16           /* N3 上升 step/tick */
+#define N3_UP_D        780          /* N3 上升幅度 */
+#define N3_DN_FAST_D   800          /* N3 快速下降幅度 (780→-20) */
+#define N3_DN_SLOW_D   1640         /* N3 慢速续降幅度 (-20→-2660) */
+#define N3_DN_STEP     16           /* N3 下降 step/tick (快速段) */
+#define N3_BOUNCE_D    98           /* N3 反弹幅度 (-2660→-2562) */
+#define N3_MICRO_STEP  2            /* N3 微调 step/tick */
+#define N1_STEP        15           /* N1 step/tick */
+#define N1_GO_D        660          /* N1 GO 偏移 */
+#define N1_BACK_D      2200         /* N1 BACK 反弹量 (-660→1995) */
+#define N1_RET_D       104          /* N1 RETURN 回退量 (1995→1891) */
+#define N2_STEP        10           /* N2 step/tick */
+#define N2_GO_D        1360         /* N2 GO 偏移 */
+#define N2_BACK_D      1370         /* N2 BACK 反弹量 (-1360→10) */
+#define N2_RET_D       11           /* N2 RETURN 回退量 (10→-1) */
+#define N4_STEP        100          /* N4 step/tick */
+#define E4_POS         ((INTEGER32)0xFFFF82FD)  /* Node4 -32003 */
+#define E4_VEL         0x00019000
+
+/* ── 时间触发 (ms) ── */
+#define T_N12_START    3250
+#define T_N4_START     7280
+#define T_STOP         10500
+#define T_SDO_RESTORE  11500
+#define T_DONE         12500
+
+/* ── N12 子阶段 ── */
+#define N12_GO         0    /* 向目标移动 */
+#define N12_BACK       1    /* 反弹过0 */
+#define N12_RETURN     2    /* 再次反转 */
+#define N12_MICRO      3    /* 微调 */
+
+/* ── 状态机 ── */
 typedef enum {
-    PHASE_IDLE             = 0,
-    PHASE_INIT             = 1,   /* 初始化, 等待启动 */
-    PHASE_0_NMT_START      = 2,   /* t=0ms: NMT 启动 Node 1,4,7 */
-    PHASE_0_SDO_LOT1       = 3,   /* t=1ms: SDO 批量写参数 (第一组) */
-    PHASE_1_SDO_NODE1      = 4,   /* t=1s: SDO Node1 微调 */
-    PHASE_2_IDLE_MONITOR   = 5,   /* t=1~11s: 闲置监测 */
-    PHASE_3_MOTION_START   = 6,   /* t=11s: 启动运动 */
-    PHASE_4_PARAM_RESTORE  = 7,   /* t=20s: 参数恢复 */
-    PHASE_5_DONE           = 8,   /* t=24s: 完成 */
-} power_on_phase_t;
+    P_IDLE = 0,
+    P_0_NMT,
+    P_1_N3_UP,
+    P_2_N3_DN,
+    P_3_N3_SETTLE,
+    P_4_N12,
+    P_5_N4,
+    P_6_STOP,
+    P_7_SDO_RESTORE,
+    P_DONE,
+} phase_t;
 
-static power_on_phase_t g_phase = PHASE_IDLE;
-static rt_timer_t  g_timer = RT_NULL;
-static rt_tick_t   g_phase_start_tick = 0;
-static int         g_seq_idx = 0;      /* sub-step index within phase */
-static int         g_sdo_pending = 0;   /* pending SDO replies */
+static phase_t    g_p  = P_IDLE;
+static rt_timer_t g_tm = RT_NULL;
+static rt_tick_t  g_t0 = 0;
+static int        g_st = 0;
+static int32_t    g_n3 = 0, g_n3_tgt = 0, g_n3_start = 0;
+static int32_t    g_n1 = 0, g_n1_tgt = 0, g_n1_start = 0;
+static int32_t    g_n2 = 0, g_n2_tgt = 0, g_n2_start = 0;
+static int32_t    g_n4 = 0;
+static int        g_n12_sub = N12_GO;
 
-/* ═══════════════════════════════════════════════════════════════
- *  SDO write helper — 向从站写入 OD 变量
- *  writeNetworkDict: nodeId, index, subIndex, count, dataType, *data, useBlockMode
- * ═══════════════════════════════════════════════════════════════ */
-static void sdo_write_u32(UNS8 nodeId, UNS16 index, UNS8 subIdx, UNS32 value)
+static rt_tick_t ms(void) { return (rt_tick_get()-g_t0)*1000/RT_TICK_PER_SECOND; }
+static void enter(phase_t p) { g_p=p; g_t0=rt_tick_get(); g_st=0; LOG_I("P%d",(int)p); }
+
+/* ── SDO 链 ── */
+typedef struct {
+    UNS8  node; UNS16 index; UNS8  sub; UNS32 value;
+} sdo_cmd_t;
+
+static const sdo_cmd_t sdo_chain_init[] = {
+    {2, 0x6083, 0, 50},  {1, 0x6083, 0, 300}, {3, 0x6083, 0, 500},
+    {3, 0x6084, 0, 500}, {1, 0x6084, 0, 100}, {1, 0x6083, 0, 100},
+    {1, 0x6084, 0, 100},
+};
+static const sdo_cmd_t sdo_chain_restore[] = {
+    {1, 0x6083, 0, 300}, {1, 0x6084, 0, 300}, {1, 0x6083, 0, 300},
+};
+
+static const sdo_cmd_t *g_sdo_chain      = NULL;
+static int               g_sdo_chain_cnt  = 0;
+static int               g_sdo_chain_idx  = 0;
+static int               g_sdo_chain_errs = 0;
+
+static void sdo_chain_next(CO_Data* d, UNS8 prev_node)
 {
-    UNS32 data = value;
-    UNS8 ret = writeNetworkDict(&Master_Data, nodeId,
-                                 index, subIdx, 4, 0, &data, 0);
-    if (ret == 0) {
-        g_sdo_pending++;
-        LOG_D("SDO: Node%d 0x%04X/%02X = %d", nodeId, index, subIdx, (int)value);
-    } else {
-        LOG_W("SDO: Node%d 0x%04X/%02X FAILED ret=%02X", nodeId, index, subIdx, ret);
+    UNS32 abortCode = 0;
+    if (g_sdo_chain_idx > 0) {
+        getWriteResultNetworkDict(d, prev_node, &abortCode);
+        if (abortCode) {
+            LOG_E("SDO[%d] node=0x%02X abort 0x%08lX",
+                  g_sdo_chain_idx - 1, prev_node, (unsigned long)abortCode);
+            g_sdo_chain_errs++;
+        }
     }
+    while (g_sdo_chain_idx < g_sdo_chain_cnt) {
+        const sdo_cmd_t *c = &g_sdo_chain[g_sdo_chain_idx];
+        int my_idx = g_sdo_chain_idx;
+        g_sdo_chain_idx++;
+        UNS32 v = c->value;
+        UNS8 ret = writeNetworkDictCallBack(&Master_Data, c->node, c->index,
+                                             c->sub, 4, 0, &v, sdo_chain_next, 0);
+        if (ret == 0) {
+            LOG_D("SDO[%d] n=0x%02X idx=0x%04X=%lu",
+                  my_idx, c->node, (unsigned long)c->index, (unsigned long)c->value);
+            return;
+        }
+        LOG_E("SDO[%d] send fail n=0x%02X ret=0x%02X", my_idx, c->node, ret);
+        g_sdo_chain_errs++;
+        getWriteResultNetworkDict(d, c->node, &abortCode);
+    }
+    LOG_I("SDO chain done: %d/%d ok", g_sdo_chain_cnt - g_sdo_chain_errs, g_sdo_chain_cnt);
 }
 
-/* ═══════════════════════════════════════════════════════════════
- *  NMT helper — 发送 NMT 状态切换命令
- * ═══════════════════════════════════════════════════════════════ */
-static void nmt_start_node(UNS8 nodeId)
+static void sdo_chain_start(const sdo_cmd_t *chain, int count)
 {
-    masterSendNMTstateChange(&Master_Data, nodeId, NMT_Start_Node);
-    LOG_I("NMT: Node 0x%02X → Start (Operational)", nodeId);
+    g_sdo_chain = (sdo_cmd_t *)chain; g_sdo_chain_cnt = count;
+    g_sdo_chain_idx = 0; g_sdo_chain_errs = 0;
+    sdo_chain_next(&Master_Data, 0);
 }
 
-/* ═══════════════════════════════════════════════════════════════
- *  RPDO2 / RPDO1 命令值设置 — 直接写 OD 变量, PDO 自动发送
- * ═══════════════════════════════════════════════════════════════ */
-static void set_all_rpdo_zero(void)
+/* 直接发温控 PDO 帧 */
+static void send_temp_pdo(void)
 {
-    mX_position    = 0;
-    mY_position    = 0;
-    mZ_position    = 0;
-    mE_position    = 0;
-    mX_velocity    = 0;
-    mY_velocity    = 0;
-    mZ_velocity    = 0;
-    mE_velocity    = 0;
-    mX_control_word = 0;
-    mY_control_word = 0;
-    mZ_control_word = 0;
-    mE_control_word = 0;
-    photometer_ch0 = 0;
-    photometer_ch1 = 0;
-    LOG_D("RPDO: all zeroed");
+    Message m;
+    memset(&m, 0, sizeof(m));
+    m.rtr = 0;
+
+    /* TPDO12 → COB 0x207: heating_target + refrigeration_target */
+    m.cob_id = 0x207;
+    m.len = 8;
+    m.data[0] = (UNS8)(heating_target & 0xFF);
+    m.data[1] = (UNS8)((heating_target >> 8) & 0xFF);
+    m.data[2] = (UNS8)((heating_target >> 16) & 0xFF);
+    m.data[3] = (UNS8)((heating_target >> 24) & 0xFF);
+    m.data[4] = (UNS8)(refrigeration_target & 0xFF);
+    m.data[5] = (UNS8)((refrigeration_target >> 8) & 0xFF);
+    m.data[6] = (UNS8)((refrigeration_target >> 16) & 0xFF);
+    m.data[7] = (UNS8)((refrigeration_target >> 24) & 0xFF);
+    canSend(Master_Data.canHandle, &m);
+
+    /* TPDO13 → COB 0x307: TEMP_control_word */
+    m.cob_id = 0x307;
+    m.len = 4;
+    m.data[0] = (UNS8)(TEMP_control_word & 0xFF);
+    m.data[1] = (UNS8)((TEMP_control_word >> 8) & 0xFF);
+    m.data[2] = (UNS8)((TEMP_control_word >> 16) & 0xFF);
+    m.data[3] = (UNS8)((TEMP_control_word >> 24) & 0xFF);
+    canSend(Master_Data.canHandle, &m);
 }
 
-static void set_motion_commands(void)
+/* 直接发转盘加热使能到 0x203 和 0x205 */
+static void send_heat_enable(void)
 {
-    /*
-     * 从 CAN 数据提取的 RPDO2 命令值:
-     *   0x301 Node1: pos=0x000001F4 (500)
-     *   0x302 Node2: pos=0x00014D55 (85333)
-     *   0x303 Node3: pos=0x00000ADC (2780) → control=0x00055355
-     *   0x304 Node4: pos=0xFFFF82FD (-32003) → control=0x00019000
-     *
-     * 映射到 OD 变量:
-     *   mX_position → Node1 RPDO2 (0x301)
-     *   mY_position → Node2 RPDO2 (0x302)
-     *   mZ_position → Node3 RPDO2 (0x303)
-     *   mE_position → Node4 RPDO2 (0x304)
-     *
-     * Node6 RPDO1 (0x206): photometer_ch0=0x18 (切换模式)
-     */
-    mX_position     = 500;           /* 0x01F4 */
-    mY_position     = 85333;         /* 0x014D55 */
-    mZ_position     = 2780;          /* 0x000ADC */
-    mE_position     = (INTEGER32)0xFFFF82FD;  /* -32003 */
-    mX_control_word = 0;
-    mY_control_word = 0;
-    mZ_control_word = 0x5355;       /* from capture (lo 16 of 0x55355) */
-    mE_control_word = 0x9000;       /* from capture (lo 16 of 0x19000) */
-    photometer_ch0  = 0x18;           /* RPDO1 Node6 模式切换 */
-    photometer_ch1  = 0;
+    Message m;
+    memset(&m, 0, sizeof(m));
+    m.rtr = 0;
 
-    LOG_I("RPDO: motion commands set");
-    LOG_I("  Node1 pos=%d ctrl=0x%04X",  (int)mX_position, mX_control_word);
-    LOG_I("  Node2 pos=%d ctrl=0x%04X",  (int)mY_position, mY_control_word);
-    LOG_I("  Node3 pos=%d ctrl=0x%04X",  (int)mZ_position, mZ_control_word);
-    LOG_I("  Node4 pos=%d ctrl=0x%04X",  (int)mE_position, mE_control_word);
-    LOG_I("  Node6 ch0=0x%04X",          photometer_ch0);
+    /* TPDO5 → COB 0x203 (Node3): mT_status_word(2B) + mT_modes(1B) */
+    m.cob_id = 0x203;
+    m.len = 3;
+    m.data[0] = 0; m.data[1] = 0;  /* mT_status_word = 0 */
+    m.data[2] = (UNS8)mT_modes;     /* mT_modes */
+    canSend(Master_Data.canHandle, &m);
+
+    /* TPDO9 → COB 0x205 (Node5): mT_modes(1B) + mT_control_word(2B) */
+    m.cob_id = 0x205;
+    m.len = 3;
+    m.data[0] = (UNS8)mT_modes;     /* mT_modes */
+    m.data[1] = 0; m.data[2] = 0;   /* mT_control_word = 0 */
+    canSend(Master_Data.canHandle, &m);
 }
 
-/* ═══════════════════════════════════════════════════════════════
- *  TPDO1 模拟 — 模拟从站心跳和状态反馈
- *  (实际硬件连接后会由 CAN 中断自动更新 OD 变量)
- * ═══════════════════════════════════════════════════════════════ */
-static void simulate_tpdo_feedback(void)
-{
-    /*
-     * 上电校验期间从站反馈:
-     *   Node1-4 TPDO1 (0x181-0x184): 状态字 0x0000↔0x0004 交替
-     *   Node6 TPDO1 (0x186): 位置 32bit
-     *   Node8 TPDO1 (0x188): 双通道 32bit
-     *
-     * 无硬件时设置模拟值，有硬件时 CAN 中断会覆盖
-     */
-    static int toggle = 0;
-    toggle ^= 1;
-
-    /* Node1-4 状态交替 */
-    mX_status_word = toggle ? 0x0004 : 0x0000;
-    mY_status_word = toggle ? 0x0004 : 0x0000;
-    mZ_status_word = toggle ? 0x0004 : 0x0000;
-    mE_status_word = toggle ? 0x0004 : 0x0000;
+static void nmt(UNS8 n) { masterSendNMTstateChange(&Master_Data,n,NMT_Start_Node); }
+static void rpdo0(void) {
+    mX_position=mY_position=mZ_position=mE_position=0;
+    mX_velocity=mY_velocity=mZ_velocity=mE_velocity=0;
+    photometer_ch0=photometer_ch1=0;
+}
+static int32_t ramp(int32_t cur, int32_t tgt, int32_t step) {
+    if(cur<tgt){cur+=step;if(cur>tgt)cur=tgt;}
+    else if(cur>tgt){cur-=step;if(cur<tgt)cur=tgt;}
+    return cur;
 }
 
-/* ═══════════════════════════════════════════════════════════════
- *  阶段切换
- * ═══════════════════════════════════════════════════════════════ */
-static void enter_phase(power_on_phase_t p)
+static void timer_cb(void *p)
 {
-    g_phase = p;
-    g_phase_start_tick = rt_tick_get();
-    g_seq_idx = 0;
-    g_sdo_pending = 0;
-    LOG_I("── Phase %d ──", (int)p);
-}
+    rt_tick_t m = ms();
+    switch (g_p) {
 
-/* ═══════════════════════════════════════════════════════════════
- *  主定时器回调 — 状态机驱动
- * ═══════════════════════════════════════════════════════════════ */
-static void check_timer_cb(void *param)
-{
-    rt_tick_t elapsed = rt_tick_get() - g_phase_start_tick;
-    rt_tick_t elapsed_ms = (elapsed * 1000) / RT_TICK_PER_SECOND;
+    /* ── P0: NMT ── */
+    case P_0_NMT:
+        if (g_st==0) { nmt(1); nmt(4); nmt(7); g_st=1; LOG_I("NMT 1,4,7"); }
+        if (m>=1) enter(P_1_N3_UP);
+        break;
 
-    switch (g_phase) {
+    /* ── P1: SDO + N3 上升 0→780 ── */
+    case P_1_N3_UP:
+        if (g_st==0) {
+            sdo_chain_start(sdo_chain_init,
+                            sizeof(sdo_chain_init)/sizeof(sdo_chain_init[0]));
+            LOG_I("SDO: N2=50 N1=300/100 N3=500/500");
+            g_n3_start = mZ_position;
+            g_n3 = g_n3_start;
+            g_n3_tgt = g_n3_start + N3_UP_D;
+            photometer_ch0 = 0x0018;
+            TEMP_control_word = 0x0003;     /* bit0=加热ON, bit1=制冷ON */
+            heating_target = 0x09C4;       /* 25.00°C (2500) */
+            refrigeration_target = 0x03E8;  /* 10.00°C (1000) */
+            mT_modes = 0x01;                /* 转盘加热使能 */
+            send_temp_pdo();                /* → 0x207 + 0x307 */
+            send_heat_enable();             /* → 0x203 + 0x205 */
+            LOG_I("Heat=25C Cool=10C");
+            g_n4 = mE_position;
+            g_st=1;
+        }
+        g_n3 = ramp(g_n3, g_n3_tgt, N3_UP_STEP);
+        mZ_position = g_n3;
+        mZ_velocity = VELOCITY;
+        if (g_n3 >= g_n3_tgt) enter(P_2_N3_DN);
+        break;
 
-    /* ── Phase 0: NMT 启动 (t=0ms) ── */
-    case PHASE_0_NMT_START:
-        if (g_seq_idx == 0) {
-            /* 模拟: Node2/Node1/Node6/Node8 心跳收齐 → 启动网络 */
-            nmt_start_node(0x01);  /* Node 1 */
-            nmt_start_node(0x04);  /* Node 4 */
-            nmt_start_node(0x07);  /* Node 7 */
-            g_seq_idx++;
+    /* ── P2: N3 下降 两段: 快速800 + 慢速1000 ── */
+    case P_2_N3_DN:
+        if (g_st==0) {
+            /* Phase A: fast ramp down by 800 */
+            g_n3_tgt = g_n3 - N3_DN_FAST_D;
+            g_st = 1;
+        }
+        if (g_st==1) {
+            g_n3 = ramp(g_n3, g_n3_tgt, N3_DN_STEP);
+            mZ_position = g_n3;
+            mZ_velocity = VELOCITY;
+            if (g_n3 <= g_n3_tgt) {
+                /* Phase B: slow ramp down further */
+                g_n3_tgt = g_n3 - N3_DN_SLOW_D;
+                g_st = 2;
+            }
+        } else {
+            g_n3 = ramp(g_n3, g_n3_tgt, N3_DN_STEP);  /* 20/tick 和成品一致 */
+            mZ_position = g_n3;
+            mZ_velocity = VELOCITY;
+            if (g_n3 <= g_n3_tgt) enter(P_3_N3_SETTLE);
+        }
+        break;
+
+    /* ── P3: N3 反弹+微调，等待 N1/N2 启动时间 ── */
+    case P_3_N3_SETTLE:
+        if (g_st==0) {
+            g_n3_tgt = g_n3 + N3_BOUNCE_D;  /* 反弹 */
+            g_st=1;
+        }
+        if (g_st==1) {
+            /* 反弹阶段: +20/tick */
+            g_n3 = ramp(g_n3, g_n3_tgt, N3_DN_STEP);
+            mZ_position = g_n3;
+            mZ_velocity = VELOCITY;
+            if (g_n3 >= g_n3_tgt) g_st=2;
+        } else {
+            /* 微调: -2/tick 直到时间到 */
+            g_n3 -= N3_MICRO_STEP;
+            mZ_position = g_n3;
+            mZ_velocity = 0x00053555;
+        }
+        /* 每秒重发一次温控 PDO */
+        if ((m % 1000) == 0) {
+            send_temp_pdo();
+            send_heat_enable();
+        }
+
+        if (m >= T_N12_START) enter(P_4_N12);
+        break;
+
+    /* ── P4: N1/N2 运动 (含反弹) ── */
+    case P_4_N12:
+        if (g_st==0) {
+            g_n1_start = mX_position;
+            g_n2_start = mY_position;
+            g_n1 = g_n1_start;
+            g_n2 = g_n2_start;
+            g_n1_tgt = g_n1_start - N1_GO_D;
+            g_n2_tgt = g_n2_start - N2_GO_D;
+            g_n12_sub = N12_GO;
+            g_st=1;
+            LOG_D("N12 start: n1=%ld→%ld n2=%ld→%ld",
+                  (long)g_n1_start, (long)g_n1_tgt,
+                  (long)g_n2_start, (long)g_n2_tgt);
+        }
+
+        switch (g_n12_sub) {
+        case N12_GO:
+            g_n1 = ramp(g_n1, g_n1_tgt, N1_STEP);
+            g_n2 = ramp(g_n2, g_n2_tgt, N2_STEP);
+            if (g_n1 <= g_n1_tgt && g_n2 <= g_n2_tgt) {
+                g_n1_tgt = g_n1 + N1_BACK_D;
+                g_n2_tgt = g_n2 + N2_BACK_D;
+                g_n12_sub = N12_BACK;
+                LOG_D("N12 back: n1→%ld n2→%ld",
+                      (long)g_n1_tgt, (long)g_n2_tgt);
+            }
+            break;
+        case N12_BACK:
+            g_n1 = ramp(g_n1, g_n1_tgt, N1_STEP);
+            g_n2 = ramp(g_n2, g_n2_tgt, N2_STEP);
+            if (g_n1 >= g_n1_tgt && g_n2 >= g_n2_tgt) {
+                g_n1_tgt = g_n1 - N1_RET_D;
+                g_n2_tgt = g_n2 - N2_RET_D;
+                g_n12_sub = N12_RETURN;
+                LOG_D("N12 ret: n1→%ld n2→%ld",
+                      (long)g_n1_tgt, (long)g_n2_tgt);
+            }
+            break;
+        case N12_RETURN:
+            g_n1 = ramp(g_n1, g_n1_tgt, N1_STEP);
+            g_n2 = ramp(g_n2, g_n2_tgt, N2_STEP);
+            if (g_n1 <= g_n1_tgt && g_n2 <= g_n2_tgt) {
+                g_n12_sub = N12_MICRO;
+                LOG_D("N12 micro");
+            }
+            break;
+        case N12_MICRO:
+            g_n1 += 1; g_n2 -= 1;
             break;
         }
-        /* 等 ~1ms → 进入 SDO 批量配置 */
-        if (elapsed_ms >= 1) {
-            enter_phase(PHASE_0_SDO_LOT1);
-        }
+
+        mX_position = g_n1; mX_velocity = VELOCITY;
+        mY_position = g_n2; mY_velocity = VELOCITY;
+        /* N3 保持微调 */
+        g_n3 -= N3_MICRO_STEP;
+        mZ_position = g_n3;
+        mZ_velocity = 0x00053555;
+
+        /* N12 MICRO 跑 1s 后进入 N4 */
+        if (g_n12_sub == N12_MICRO && m >= 1000) enter(P_5_N4);
         break;
 
-    /* ── Phase 0.1: SDO 批量写参数 (t=1ms) ── */
-    case PHASE_0_SDO_LOT1:
-        if (g_seq_idx == 0) {
-            /*
-             * CAN 数据中 t=0.0006s 的 SDO 序列:
-             *   Node2: 0x6083/00 = 50
-             *   Node1: 0x6083/00 = 300
-             *   Node3: 0x6083/00 = 500
-             *   Node3: (special NMT command)
-             *   Node3: 0x6084/00 = 500
-             */
-            sdo_write_u32(0x02, 0x6083, 0x00, 50);    /* Node2 Accel */
-            sdo_write_u32(0x01, 0x6083, 0x00, 300);   /* Node1 Accel */
-            sdo_write_u32(0x03, 0x6083, 0x00, 500);   /* Node3 Accel */
-            sdo_write_u32(0x03, 0x6084, 0x00, 500);   /* Node3 Decel */
-            g_seq_idx++;
-            break;
+    /* ── P5: N4 下降 ── */
+    case P_5_N4:
+        if (g_st==0) {
+            LOG_I("N4: %ld→%ld", (long)g_n4, (long)E4_POS);
+            g_st=1;
         }
-        /* SDO 应答收齐后 → 延迟到 t=1s */
-        if (elapsed_ms >= 999) {
-            enter_phase(PHASE_1_SDO_NODE1);
-        }
+        g_n4 = ramp(g_n4, (int32_t)E4_POS, N4_STEP);
+        mE_position = g_n4;
+        mE_velocity = E4_VEL;
+        /* N1/N2/N3 hold */
+        mX_position = g_n1;
+        mY_position = g_n2;
+        mZ_position = g_n3;
+        /* N4 到达目标即 STOP */
+        if (g_n4 <= (int32_t)E4_POS) enter(P_6_STOP);
         break;
 
-    /* ── Phase 1: Node1 微调 (t=1s) ── */
-    case PHASE_1_SDO_NODE1:
-        if (g_seq_idx == 0) {
-            /*
-             * CAN 数据中 t=1.000s 的 SDO 序列:
-             *   Node1: 0x6084/00 = 100
-             *   Node1: 0x6083/00 = 100
-             *   Node1: (special NMT command)
-             *   Node1: 0x6084/00 = 100
-             */
-            sdo_write_u32(0x01, 0x6084, 0x00, 100);
-            sdo_write_u32(0x01, 0x6083, 0x00, 100);
-            sdo_write_u32(0x01, 0x6084, 0x00, 100);
-            g_seq_idx++;
-            break;
-        }
-        /* 等 SDO 完成 → 进入闲置期 */
-        if (elapsed_ms >= 200) {
-            /* 确保 RPDO 全为零 (闲置状态) */
-            set_all_rpdo_zero();
-            enter_phase(PHASE_2_IDLE_MONITOR);
-        }
+    /* ── P6: STOP ── */
+    case P_6_STOP:
+        rpdo0(); LOG_I("STOP"); enter(P_7_SDO_RESTORE);
         break;
 
-    /* ── Phase 2: 闲置监测 (t=1~11s) ── */
-    case PHASE_2_IDLE_MONITOR:
-        /* 模拟 Node1-4 状态反馈 */
-        simulate_tpdo_feedback();
-
-        /* 10 秒闲置后 → 启动运动 (CAN 数据中 t=11s 运动开始) */
-        if (elapsed_ms >= 10000) {
-            enter_phase(PHASE_3_MOTION_START);
+    /* ── P7: SDO 恢复 (每200ms发一个，避免同节点冲突) ── */
+    case P_7_SDO_RESTORE:
+        if (g_st==0) {
+            LOG_I("SDO restore: N1=300/300");
+            g_st = 1;
         }
+        /* 每100ms发一个SDO，等上一个完成 */
+        {
+            int idx = (m / 100);
+            if (idx < (int)(sizeof(sdo_chain_restore)/sizeof(sdo_chain_restore[0]))
+                && (m % 100) == 0 && idx >= g_st - 1)
+            {
+                const sdo_cmd_t *c = &sdo_chain_restore[idx];
+                UNS32 v = c->value;
+                UNS8 ret = writeNetworkDict(&Master_Data, c->node, c->index,
+                                            c->sub, 4, 0, &v, 0);
+                if (ret == 0) {
+                    LOG_D("SDO restore[%d] ok", idx);
+                    g_st = idx + 2;  /* advance */
+                } else {
+                    LOG_E("SDO restore[%d] fail ret=0x%02X", idx, ret);
+                }
+            }
+        }
+        if (m >= 1500) enter(P_DONE);
         break;
 
-    /* ── Phase 3: 运动启动 (t=11s) ── */
-    case PHASE_3_MOTION_START:
-        if (g_seq_idx == 0) {
-            set_motion_commands();
-            LOG_I("Motion started — RPDO2 streaming...");
-            g_seq_idx++;
-            break;
-        }
-        /*
-         * 运动执行 9 秒 (t=11s → t=20s)
-         * 实际运行中 CAN 中断会持续收 TPDO 更新 OD 变量
-         */
-        simulate_tpdo_feedback();
-        if (elapsed_ms >= 9000) {
-            enter_phase(PHASE_4_PARAM_RESTORE);
-        }
+    /* ── DONE ── */
+    case P_DONE:
+        if (g_st==0) { rpdo0(); LOG_I("DONE"); g_st=1; }
+        if (g_tm) { rt_timer_stop(g_tm); rt_timer_delete(g_tm); g_tm=RT_NULL; }
         break;
 
-    /* ── Phase 4: 参数恢复 (t=20s) ── */
-    case PHASE_4_PARAM_RESTORE:
-        if (g_seq_idx == 0) {
-            /*
-             * CAN 数据中 t=20.000s 恢复:
-             *   Node1: 0x6083/00 = 300
-             *   Node1: 0x6084/00 = 300
-             *   Node1: 0x6083/00 = 300 (重复)
-             */
-            sdo_write_u32(0x01, 0x6083, 0x00, 300);
-            sdo_write_u32(0x01, 0x6084, 0x00, 300);
-            sdo_write_u32(0x01, 0x6083, 0x00, 300);
-            g_seq_idx++;
-            break;
-        }
-        /* 等 4 秒 → 完成 */
-        if (elapsed_ms >= 4000) {
-            enter_phase(PHASE_5_DONE);
-        }
-        break;
-
-    /* ── Phase 5: 完成 ── */
-    case PHASE_5_DONE:
-        set_all_rpdo_zero();
-        LOG_I("══════ Power-on check DONE ══════");
-        g_timer = RT_NULL;  /* timer will be auto-stopped */
-        break;
-
-    default:
-        break;
+    default: break;
     }
+    sendPDOevent(&Master_Data);
 }
 
-/* ═══════════════════════════════════════════════════════════════
- *  Public API
- * ═══════════════════════════════════════════════════════════════ */
-
-int power_on_check_init(void)
-{
-    LOG_I("Power-on check module init");
-    g_phase = PHASE_IDLE;
-    return 0;
+/* ── Public API ── */
+#define PWRCHK_VER "20260705_2325"  /* 版本: TIM3硬件t3.5定时器 */
+int power_on_check_init(void) { LOG_I("ver %s", PWRCHK_VER); g_p=P_IDLE; return 0; }
+void power_on_check_start(void) {
+    if (g_p!=P_IDLE&&g_p!=P_DONE) return;
+    LOG_I("START"); rpdo0(); g_n3=g_n1=g_n2=g_n4=0;
+    g_tm=rt_timer_create("pwrchk",timer_cb,RT_NULL,rt_tick_from_millisecond(10),
+                         RT_TIMER_FLAG_PERIODIC|RT_TIMER_FLAG_SOFT_TIMER);
+    if(g_tm){enter(P_0_NMT);rt_timer_start(g_tm);}
 }
-
-void power_on_check_start(void)
-{
-    if (g_phase != PHASE_IDLE && g_phase != PHASE_5_DONE) {
-        LOG_W("Already running (phase %d)", (int)g_phase);
-        return;
-    }
-
-    LOG_I("══════ Power-on check START ══════");
-
-    /* 确保 RPDO 初始为零 */
-    set_all_rpdo_zero();
-
-    /* 启动定时器: 每 50ms 驱动一次状态机 (匹配 CAN 数据的实时性) */
-    g_timer = rt_timer_create("pwrchk", check_timer_cb, RT_NULL,
-                                rt_tick_from_millisecond(50),
-                                RT_TIMER_FLAG_PERIODIC | RT_TIMER_FLAG_SOFT_TIMER);
-    if (g_timer) {
-        enter_phase(PHASE_0_NMT_START);
-        rt_timer_start(g_timer);
-    } else {
-        LOG_E("Failed to create timer");
-    }
+void power_on_check_stop(void) {
+    if(g_tm){rt_timer_stop(g_tm);rt_timer_delete(g_tm);g_tm=RT_NULL;}
+    rpdo0(); g_p=P_IDLE;
 }
-
-void power_on_check_stop(void)
-{
-    if (g_timer) {
-        rt_timer_stop(g_timer);
-        rt_timer_delete(g_timer);
-        g_timer = RT_NULL;
-    }
-    set_all_rpdo_zero();
-    g_phase = PHASE_IDLE;
-    LOG_I("Power-on check STOPPED");
+int power_on_check_is_running(void){return g_p>P_IDLE&&g_p<P_DONE;}
+int power_on_check_get_phase(void){return(int)g_p;}
+const char *power_on_check_get_phase_name(void) {
+    static const char *n[]={"IDLE","NMT","N3_UP","N3_DN","N3_SETTLE",
+        "N12","N4","STOP","SDO_RESTORE","DONE"};
+    return n[(int)g_p<=P_DONE?(int)g_p:0];
 }
-
-int power_on_check_is_running(void)
-{
-    return (g_phase > PHASE_IDLE && g_phase < PHASE_5_DONE) ? 1 : 0;
-}
-
-int power_on_check_get_phase(void)
-{
-    return (int)g_phase;
-}
-
-const char *power_on_check_get_phase_name(void)
-{
-    switch (g_phase) {
-    case PHASE_IDLE:            return "IDLE";
-    case PHASE_INIT:            return "INIT";
-    case PHASE_0_NMT_START:     return "NMT_START";
-    case PHASE_0_SDO_LOT1:      return "SDO_CONFIG";
-    case PHASE_1_SDO_NODE1:     return "SDO_NODE1_TUNE";
-    case PHASE_2_IDLE_MONITOR:  return "IDLE_MONITOR";
-    case PHASE_3_MOTION_START:  return "MOTION";
-    case PHASE_4_PARAM_RESTORE: return "PARAM_RESTORE";
-    case PHASE_5_DONE:          return "DONE";
-    default:                    return "???";
-    }
-}
-
-/* ═══════════════════════════════════════════════════════════════
- *  Finsh 命令
- * ═══════════════════════════════════════════════════════════════ */
 #ifdef RT_USING_FINSH
 #include <finsh.h>
-
-static int pwrchk(int argc, char **argv)
-{
-    if (argc < 2) {
-        rt_kprintf("Usage: pwrchk start | stop | status\n");
-        rt_kprintf("  Phase: %d (%s)  Running: %s\n",
-                   (int)g_phase, power_on_check_get_phase_name(),
-                   power_on_check_is_running() ? "yes" : "no");
-        return 0;
-    }
-    if (strcmp(argv[1], "start") == 0) {
-        power_on_check_start();
-    } else if (strcmp(argv[1], "stop") == 0) {
-        power_on_check_stop();
-    } else if (strcmp(argv[1], "status") == 0) {
-        rt_kprintf("Phase: %s (%d), Running: %s\n",
-                   power_on_check_get_phase_name(), (int)g_phase,
-                   power_on_check_is_running() ? "yes" : "no");
-    } else {
-        rt_kprintf("Unknown: %s\n", argv[1]);
-    }
+static int pwrchk(int argc,char**argv){
+    if(argc<2){rt_kprintf("pwrchk start|stop|status\n");return 0;}
+    if(!strcmp(argv[1],"start")) power_on_check_start();
+    else if(!strcmp(argv[1],"stop")) power_on_check_stop();
+    else if(!strcmp(argv[1],"status"))
+        rt_kprintf("%s(%d) n1=%ld(%ld) n2=%ld(%ld) n3=%ld n4=%ld\n",
+                   power_on_check_get_phase_name(),(int)g_p,
+                   (long)g_n1,(long)g_n1_tgt,(long)g_n2,(long)g_n2_tgt,
+                   (long)g_n3,(long)g_n4);
     return 0;
 }
-MSH_CMD_EXPORT(pwrchk, Power-on check control);
-#endif /* RT_USING_FINSH */
+MSH_CMD_EXPORT(pwrchk, power-on check);
+#endif

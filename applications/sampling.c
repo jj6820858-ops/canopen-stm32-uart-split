@@ -43,6 +43,8 @@ extern UNS16    photometer_ch0;       /* RPDO1 Node6 */
 extern UNS16    photometer_ch1;
 extern UNS32    current_heating;      /* Node8 ch1 → Modbus 0x0063 */
 extern UNS32    current_refrigeration;/* Node8 ch2 → Modbus 0x0064 */
+extern UNS32    heating_target;        /* OD 0x201E → PDO 0x207 */
+extern UNS32    refrigeration_target;  /* OD 0x201F → PDO 0x207 */
 
 #define DBG_TAG "sample"
 #define DBG_LVL DBG_LOG
@@ -69,6 +71,7 @@ const int32_t slot_positions[SLOT_COUNT] = {
 #define R_MOTOR      11    /* 0x000B 电机控制 */
 #define R_LIGHT      15    /* 0x000F 光强 */
 #define R_DEV_STAT   17    /* 0x0011 设备状态 */
+#define R_COOLING    14    /* 0x000E 酶孔位制冷 (Modbus 00015) */
 #define R_HEAT       99    /* 0x0063 加热温度 */
 #define R_COOL       100   /* 0x0064 制冷温度 */
 #define R_PARAM      119   /* 0x0077 参数控制 */
@@ -261,9 +264,42 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
         }
         break;
 
+    /* ── 0x000E: 酶孔位制冷 ── */
+    case R_COOLING:
+        if (value == 0x0001) {
+            refrigeration_target = 0x6400;  /* 100×100 = 10.0°C, enable */
+            LOG_I("Cooling: ON");
+        } else if (value == 0x8000) {
+            /* 上位机写入 0x8000 — 光强触发信号 */
+            photometer_ch0 = 0x0018;
+            LOG_I("Light: TRIGGER (via 0x000F=0x8000)");
+        } else {
+            refrigeration_target = 0;
+            LOG_I("Cooling: OFF");
+        }
+        break;
+
+    /* ── 0x0010: 光强读数 (只读) ── */
+    case R_LIGHT:
+        LOG_D("Light read: 0x%04X", value);
+        break;
+
+    /* ── 0x0063: 转盘加热目标温度 ── */
+    case R_HEAT:
+        heating_target = ((UNS32)value) * 100;  /* ×100 */
+        LOG_I("Heat target: %d.%d°C", value, value ? 0 : 0);
+        break;
+
+    /* ── 0x0064: 制冷目标温度 ── */
+    case R_COOL:
+        refrigeration_target = ((UNS32)value) * 100;  /* ×100 */
+        LOG_I("Cool target: %d.%d°C", value, value ? 0 : 0);
+        break;
+
     /* ── 0x0078: 称重控制 ── */
     case R_WEIGH:
-        LOG_D("Weigh ctrl: 0x%04X", value);
+        LOG_I("Weigh ctrl: 0x%04X", value);
+        /* 0x0006 = 标定+去皮+容量 */
         break;
 
     default:
@@ -292,3 +328,45 @@ int sampling_init(void)
     LOG_I("Sampling init — Modbus→CAN gateway ready");
     return 0;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+ *  Finsh: Modbus 寄存器仿真测试 (不用上位机)
+ * ═══════════════════════════════════════════════════════════════ */
+#ifdef RT_USING_FINSH
+#include <finsh.h>
+
+/* mbreg <addr> <value> — 仿真上位机写 Modbus 寄存器 */
+static int mbreg(int argc, char **argv)
+{
+    if (argc < 3) {
+        rt_kprintf("Usage: mbreg <addr> <value>\n");
+        rt_kprintf("  Cool ON:    mbreg 14 1\n");
+        rt_kprintf("  Cool OFF:   mbreg 14 0\n");
+        rt_kprintf("  Heat temp:  mbreg 191 25\n");
+        rt_kprintf("  Cool temp:  mbreg 192 10\n");
+        rt_kprintf("  Motor STOP: mbreg 11 0x8000\n");
+        rt_kprintf("  Motor GO:   mbreg 11 0x9000\n");
+        rt_kprintf("  Pump ON:    mbreg 5 0x2000\n");
+        rt_kprintf("  Read reg:   mbreg <addr>\n");
+        rt_kprintf("  (addr = 0-based decimal, 0x for hex)\n");
+        return 0;
+    }
+    uint16_t addr = (uint16_t)strtoul(argv[1], NULL, 0);
+
+    if (argc >= 3) {
+        /* Write */
+        uint16_t val = (uint16_t)strtoul(argv[2], NULL, 0);
+        uint8_t data[2] = { (uint8_t)(val >> 8), (uint8_t)(val & 0xFF) };
+        reg_write(addr, 1, data);
+        rt_kprintf("  WRITE reg[%d] = 0x%04X (%d)\n", addr, val, val);
+    } else {
+        /* Read */
+        uint8_t buf[4];
+        reg_read(addr, 1, buf);
+        uint16_t v = ((uint16_t)buf[0] << 8) | buf[1];
+        rt_kprintf("  READ  reg[%d] = 0x%04X (%d)\n", addr, v, v);
+    }
+    return 0;
+}
+MSH_CMD_EXPORT(mbreg, Modbus register read/write test);
+#endif

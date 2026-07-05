@@ -13,15 +13,18 @@ extern UNS32 Master_obj1016[];
 
 void TestMaster_initialisation(CO_Data *d)
 {
+    int i;
+
     /* Enable master heartbeat: 1000ms on COB-ID 0x700 */
     Master_obj1017 = 1000;
 
-    /* Monitor slave node 1 heartbeat (3s timeout) */
-    Master_highestSubIndex_obj1016 = 1;
-    Master_obj1016[0] = 0x00010BB8;  /* node=1, timeout=3000ms */
+    /* Monitor slaves 1~8 heartbeat (3s timeout each) */
+    Master_highestSubIndex_obj1016 = 8;
+    for (i = 0; i < 8; i++) {
+        Master_obj1016[i] = ((UNS32)(i + 1) << 16) | 0x0BB8;  /* nodeId | 3000ms */
+    }
 
-    LOG_I("Master: initialisation — heartbeat 1s, monitoring slave node 1");
-    LOG_I("  COB-ID: 0x700 (master) / 0x701 (slave)");
+    LOG_I("Master: heartbeat 1s, monitoring slaves 1~8 (3s timeout)");
     (void)d;
 }
 

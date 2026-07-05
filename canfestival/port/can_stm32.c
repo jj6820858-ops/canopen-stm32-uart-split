@@ -20,6 +20,11 @@ static volatile uint8_t   rx_head = 0;
 static volatile uint8_t   rx_tail = 0;
 static volatile uint8_t   rx_count = 0;
 
+/* Counters for diagnostics */
+volatile uint32_t g_can_tx_ok  = 0;
+volatile uint32_t g_can_tx_err = 0;
+volatile uint32_t g_can_rx_cnt = 0;
+
 /* Convert CANfestival baud string to prescaler.
  * APB1 clock = 36 MHz, 250 Kbps target:
  *   TQ = Prescaler / 36MHz = 9 / 36MHz = 0.25 µs
@@ -143,6 +148,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
         rx_head = (rx_head + 1) % CAN_RX_BUF_SIZE;
         rx_count++;
     }
+    g_can_rx_cnt++;
 }
 
 void USB_LP_CAN1_RX0_IRQHandler(void)
@@ -179,6 +185,7 @@ UNS8 canSend(CAN_HANDLE fd, Message const *m)
 
     if (HAL_CAN_AddTxMessage(&hcan1, &tx_header, (uint8_t *)m->data,
                              &tx_mailbox) != HAL_OK) {
+        g_can_tx_err++;
         /* Attempt Bus-Off recovery */
         if (__HAL_CAN_GET_FLAG(&hcan1, CAN_FLAG_BOF)) {
             HAL_CAN_Stop(&hcan1);
@@ -198,12 +205,14 @@ UNS8 canSend(CAN_HANDLE fd, Message const *m)
             /* Retry once after recovery */
             if (HAL_CAN_AddTxMessage(&hcan1, &tx_header, (uint8_t *)m->data,
                                      &tx_mailbox) == HAL_OK) {
-                return 1;
+                g_can_tx_ok++;
+                return 0;   /* success */
             }
         }
-        return 0;
+        return 1;   /* failure */
     }
-    return 1;
+    g_can_tx_ok++;
+    return 0;   /* success */
 }
 
 CAN_HANDLE canOpen(s_BOARD *board)

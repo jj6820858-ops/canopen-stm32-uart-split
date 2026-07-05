@@ -147,7 +147,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1016 :   Consumer Heartbeat Time */
                     UNS8 Master_highestSubIndex_obj1016 = 0;
-                    UNS32 Master_obj1016[]={0};
+                    UNS32 Master_obj1016[]={0,0,0,0,0,0,0,0};
 
 /* index 0x1017 :   Producer Heartbeat Time */ 
                     UNS16 Master_obj1017 = 0x0;   /* 0 */

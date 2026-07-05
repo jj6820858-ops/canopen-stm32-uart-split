@@ -58,7 +58,7 @@ static const od_sync_t od_sync[] = {
     { 11, &mT_position,       4 },  /* 00012~00013  转盘位置 (lo 32-bit of 48) */
 
     /* ── 制冷 ── */
-    { 14, &refrigeration_target, 4 }, /* 00015  酶孔位制冷 */
+    { 14, &refrigeration_target, 1 }, /* 00015  酶孔位制冷 (UNS8) */
 
     /* ── 光强 (RPDO6 mapped) ── */
     { 15, &photometer_ch0,    2 },  /* 00016  光强 ch0 (lo 16) */

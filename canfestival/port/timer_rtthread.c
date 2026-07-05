@@ -66,6 +66,11 @@ void TimerCleanup(void)
 void EnterMutex(void) { }
 void LeaveMutex(void) { }
 
+/* CAN diagnostics — declared in can_stm32.c */
+extern volatile uint32_t g_can_tx_ok;
+extern volatile uint32_t g_can_tx_err;
+extern volatile uint32_t g_can_rx_cnt;
+
 static void timer_thread_entry(void *param)
 {
     (void)param;
@@ -84,9 +89,14 @@ static void timer_thread_entry(void *param)
             rt_kprintf("[PDO] csPDO was 0, forcing to 1\n");
         }
         /* Fire event-driven TPDOs (type 0xFE/0xFF) on OD variable change */
-        UNS8 sent = sendPDOevent(d);
+        sendPDOevent(d);
         if (++loop_cnt % 1000 == 0)
-            rt_kprintf("[PDO] loop #%d, sent=%d, csPDO=%d\n", loop_cnt, sent, d->CurrentCommunicationState.csPDO);
+            rt_kprintf("[CAN] loop #%d, tx=%lu err=%lu rx=%lu csPDO=%d\n",
+                       loop_cnt,
+                       (unsigned long)g_can_tx_ok,
+                       (unsigned long)g_can_tx_err,
+                       (unsigned long)g_can_rx_cnt,
+                       d->CurrentCommunicationState.csPDO);
         rt_thread_mdelay(5);
     }
 }

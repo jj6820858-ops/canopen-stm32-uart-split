@@ -19,7 +19,7 @@
 #define MODBUS_SLAVE_ADDR   CONFIG_MODBUS_SLAVE_ADDR
 #define MODBUS_PORT         2           /* UART2 */
 #define MODBUS_BAUDRATE     115200
-#define MB_POLL_MS          20
+#define MB_POLL_MS          5
 
 /* PC0 — 触发电源控制 (推挽输出, 高电平使能) */
 #define PWR_CTRL_PORT       GPIOC
@@ -29,16 +29,15 @@ static void pwr_ctrl_init(void)
 {
     GPIO_InitTypeDef gpio = {0};
     gpio.Pin   = PWR_CTRL_PIN;
-    gpio.Mode  = GPIO_MODE_OUTPUT_PP;    /* 推挽输出 */
+    gpio.Mode  = GPIO_MODE_OUTPUT_PP;
     gpio.Pull  = GPIO_NOPULL;
     gpio.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(PWR_CTRL_PORT, &gpio);
-    HAL_GPIO_WritePin(PWR_CTRL_PORT, PWR_CTRL_PIN, GPIO_PIN_SET);  /* 高电平 */
+    HAL_GPIO_WritePin(PWR_CTRL_PORT, PWR_CTRL_PIN, GPIO_PIN_SET);
 }
 
 int main(void)
 {
-    /* 上电先打开电源 */
     pwr_ctrl_init();
     rt_kprintf("PC0 → push-pull HIGH (power supply ON)\n");
 
