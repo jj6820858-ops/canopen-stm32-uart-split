@@ -39,10 +39,25 @@ UART2:   PA2(TX) PA3(RX) → USB-TTL → 上位机 (Modbus RTU)
 
 ```
 applications/
-├── main.c                   初始化入口
-├── reg_router.c/.h          Modbus ↔ CANopen 路由表 (43条, 本地OD)
-├── canopen_master.c/.h      CANopen 主站 (初始化/回调/PDO配置)
-└── reg_router.h             路由条目结构定义
+├── core/                    应用入口
+│   └── main.c
+├── threads/                 线程/任务统一创建和启动
+│   └── app_thread.c/.h
+├── protocol/                Modbus 协议表和寄存器路由
+│   ├── protocol_table.c/.h
+│   └── reg_router.c/.h
+├── canopen/                 CANopen 主站封装
+│   └── canopen_master.c/.h
+├── gateway/                 Modbus 指令到 CANopen 动作转发
+│   └── sampling.c/.h
+└── workflow/                上电校验流程
+    └── power_on_check.c/.h
+
+tests/
+├── can_test.c               CAN 总线调试命令
+├── motor_test.c             X 轴调试命令
+├── pdo_test.c               PDO 调试命令
+└── tools/mbcrc.py           Modbus CRC 辅助工具
 
 canfestival/
 ├── od_master/ObjDict.c/.h   主站对象字典 (Master.od, 109个索引)
@@ -52,7 +67,7 @@ canfestival/
 └── include/                 协议头文件
 
 packages/freemodbus/
-└── port/user_mb_app.c       Modbus 从站回调 → reg_router
+└── port/user_mb_app.c       Modbus 从站回调 → applications/protocol/reg_router
 ```
 
 ### 数据流
@@ -111,7 +126,7 @@ RPDO (从站→主站反馈): 每轴 status_word+current_actual / 传感器数�
 
 协议文档: `C:\Users\lenovo\Desktop\快检设备交互协议20250609.xlsx`
 
-所有 43 个 Master.od 对象均有 Modbus 映射，详见 `applications/reg_router.c` 中 `g_routes[]` 表。
+Modbus 协议说明表位于 `applications/protocol/protocol_table.c`，寄存器读写路由位于 `applications/protocol/reg_router.c`。
 
 | 区域 | Modbus 地址 | 内容 |
 |------|------------|------|

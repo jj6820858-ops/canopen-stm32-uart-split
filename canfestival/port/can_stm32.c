@@ -1,11 +1,11 @@
-/* Prevent GCC14 newlib signal.h conflict with RT-Thread libc_signal.h */
+/* 避免 GCC14 newlib signal.h 与 RT-Thread libc_signal.h 冲突 */
 #define _SIGNAL_H_
 
 #include <rtthread.h>
 #include <string.h>
 #include "can_stm32.h"
 
-/* STM32F103RC device select (required by HAL) */
+/* HAL 需要明确芯片型号宏 */
 #if !defined(STM32F103xE)
 #define STM32F103xE
 #endif
@@ -20,22 +20,22 @@ static volatile uint8_t   rx_head = 0;
 static volatile uint8_t   rx_tail = 0;
 static volatile uint8_t   rx_count = 0;
 
-/* Counters for diagnostics */
+/* CAN 诊断计数 */
 volatile uint32_t g_can_tx_ok  = 0;
 volatile uint32_t g_can_tx_err = 0;
 volatile uint32_t g_can_rx_cnt = 0;
 
-/* Convert CANfestival baud string to prescaler.
- * APB1 clock = 36 MHz, 250 Kbps target:
- *   TQ = Prescaler / 36MHz = 9 / 36MHz = 0.25 µs
- *   BitTime = (1 + 11 + 4) × TQ = 16 × 0.25 µs = 4 µs
- *   BaudRate = 1 / 4µs = 250 Kbps
+/* 将 CANfestival 波特率字符串转换为 HAL 分频参数。
+ * APB1 时钟 = 36 MHz，目标波特率 250 Kbps:
+ *   TQ = Prescaler / 36MHz = 9 / 36MHz = 0.25us
+ *   BitTime = (1 + 11 + 4) * TQ = 16 * 0.25us = 4us
+ *   BaudRate = 1 / 4us = 250 Kbps
  */
 static void can_set_baudrate(char *baud)
 {
     CAN_InitTypeDef *init = &hcan1.Init;
 
-    /* Common settings for all baud rates */
+    /* 各波特率共用配置 */
     init->Mode                = CAN_MODE_NORMAL;
     init->SyncJumpWidth       = CAN_SJW_2TQ;
     init->TimeTriggeredMode   = DISABLE;
@@ -59,14 +59,12 @@ static void can_set_baudrate(char *baud)
         init->TimeSeg1 = CAN_BS1_11TQ;
         init->TimeSeg2 = CAN_BS2_4TQ;
     } else {
-        /* 50K default (PCLK1=36MHz) */
+        /* 默认 50K，PCLK1=36MHz */
         init->Prescaler = 60;
         init->TimeSeg1 = CAN_BS1_9TQ;
         init->TimeSeg2 = CAN_BS2_2TQ;
     }
 }
-
-static void can_test_auto_start(rt_uint32_t interval_ms);
 
 void can_hardware_init(void)
 {
@@ -75,7 +73,7 @@ void can_hardware_init(void)
     __HAL_RCC_AFIO_CLK_ENABLE();
 
     /* PA15 = CAN transceiver RS pin, pull low for normal mode */
-    __HAL_AFIO_REMAP_SWJ_NOJTAG();  /* release PA15 from JTAG */
+    __HAL_AFIO_REMAP_SWJ_NOJTAG();  /* 释放 JTAG 占用的 PA15 */
     GPIO_InitTypeDef gpio_rs = {0};
     gpio_rs.Pin = GPIO_PIN_15;
     gpio_rs.Mode = GPIO_MODE_OUTPUT_PP;
@@ -84,7 +82,7 @@ void can_hardware_init(void)
     HAL_GPIO_Init(GPIOA, &gpio_rs);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
 
-    /* PA12=CAN_TX (output), PA11=CAN_RX (input) */
+    /* PA12=CAN_TX 输出，PA11=CAN_RX 输入 */
     GPIO_InitTypeDef gpio = {0};
     gpio.Pin = GPIO_PIN_12;
     gpio.Mode = GPIO_MODE_AF_PP;
@@ -92,7 +90,7 @@ void can_hardware_init(void)
     HAL_GPIO_Init(GPIOA, &gpio);
 
     gpio.Pin = GPIO_PIN_11;
-    gpio.Mode = GPIO_MODE_INPUT;       /* CAN_RX is an input, not output */
+    gpio.Mode = GPIO_MODE_INPUT;       /* CAN_RX 必须配置为输入 */
     gpio.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &gpio);
 
@@ -103,9 +101,9 @@ void can_hardware_init(void)
         return;
     }
 
-    /* Configure filter 1: ID mask mode, 32-bit, accept all (CANopen master).
-     * FilterBank 1 (STM32F103 has filters 0-13 for CAN1).
-     * SlaveStartFilterBank=14 is reserved for CAN2 (not used on F103). */
+    /* 配置过滤器 1: ID 掩码模式，32 位，主站接收全部标准帧。
+     * STM32F103 的 CAN1 使用过滤器 0~13。
+     * SlaveStartFilterBank=14 预留给 CAN2，本项目未使用 CAN2。 */
     CAN_FilterTypeDef filter = {0};
     filter.FilterBank           = 1;
     filter.FilterMode           = CAN_FILTERMODE_IDMASK;
@@ -125,11 +123,11 @@ void can_hardware_init(void)
     }
     HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
-    /* Enable CAN RX interrupt in NVIC */
+    /* 打开 CAN RX 中断 */
     HAL_NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
 
-    /* CAN test thread disabled - CANopen stack handles all CAN communication */
+    /* CAN 测试命令已移到 tests/can_test.c，线程创建由 app_thread.c 统一管理。 */
 }
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
@@ -186,7 +184,7 @@ UNS8 canSend(CAN_HANDLE fd, Message const *m)
     if (HAL_CAN_AddTxMessage(&hcan1, &tx_header, (uint8_t *)m->data,
                              &tx_mailbox) != HAL_OK) {
         g_can_tx_err++;
-        /* Attempt Bus-Off recovery */
+        /* 尝试 Bus-Off 恢复 */
         if (__HAL_CAN_GET_FLAG(&hcan1, CAN_FLAG_BOF)) {
             HAL_CAN_Stop(&hcan1);
             CAN_FilterTypeDef filter = {0};
@@ -202,17 +200,17 @@ UNS8 canSend(CAN_HANDLE fd, Message const *m)
             HAL_CAN_ConfigFilter(&hcan1, &filter);
             HAL_CAN_Start(&hcan1);
             HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
-            /* Retry once after recovery */
+            /* 恢复后重试一次 */
             if (HAL_CAN_AddTxMessage(&hcan1, &tx_header, (uint8_t *)m->data,
                                      &tx_mailbox) == HAL_OK) {
                 g_can_tx_ok++;
-                return 0;   /* success */
+                return 0;   /* 成功 */
             }
         }
-        return 1;   /* failure */
+        return 1;   /* 失败 */
     }
     g_can_tx_ok++;
-    return 0;   /* success */
+    return 0;   /* 成功 */
 }
 
 CAN_HANDLE canOpen(s_BOARD *board)
@@ -238,139 +236,3 @@ UNS8 canChangeBaudRate(CAN_HANDLE fd, char *baud)
     return 0;
 }
 
-/* ==================================================================
- * CAN Test: continuously send a message for USB-CAN analyzer testing
- * ================================================================== */
-#include <finsh.h>
-
-static rt_thread_t g_test_thread = RT_NULL;
-static volatile int  g_test_running = 0;
-
-static void can_test_entry(void *param)
-{
-    rt_uint32_t interval_ms = (rt_uint32_t)(rt_ubase_t)param;
-    rt_uint32_t count = 0;
-
-    rt_kprintf("[CAN_TEST] Started, interval=%dms, ID=0x123\n", interval_ms);
-    rt_kprintf("[CAN_TEST] Use 'can_test_stop' to stop, 'can_test_start 200' to resume\n");
-
-    while (g_test_running)
-    {
-        CAN_TxHeaderTypeDef tx_header = {0};
-        uint32_t tx_mailbox;
-        uint8_t data[8];
-
-        for (int i = 0; i < 8; i++)
-            data[i] = count + i;
-
-        tx_header.StdId               = 0x123;
-        tx_header.ExtId               = 0;
-        tx_header.IDE                 = CAN_ID_STD;
-        tx_header.RTR                 = CAN_RTR_DATA;
-        tx_header.DLC                 = 8;
-        tx_header.TransmitGlobalTime  = DISABLE;
-
-        HAL_StatusTypeDef ret = HAL_CAN_AddTxMessage(&hcan1, &tx_header,
-                                                      data, &tx_mailbox);
-        if (ret == HAL_OK) {
-            if ((count % 100) == 0) {
-                rt_kprintf("[CAN_TEST] Sent %d frames OK (count=%d)\n",
-                           (count + 1), count);
-            }
-        } else {
-            uint32_t esr = hcan1.Instance->ESR;
-            rt_kprintf("[CAN_TEST] FAIL count=%d, ret=%d "
-                       "state=%lu err=0x%08lx "
-                       "ESR=0x%08lx (TEC=%lu REC=%lu LEC=%lu)\n",
-                       count, ret,
-                       (unsigned long)hcan1.State,
-                       (unsigned long)hcan1.ErrorCode,
-                       (unsigned long)esr,
-                       (unsigned long)((esr & CAN_ESR_TEC) >> 16),
-                       (unsigned long)((esr & CAN_ESR_REC) >> 8),
-                       (unsigned long)(esr & CAN_ESR_LEC));
-
-            /* Bus-Off recovery: stop and restart the CAN controller */
-            if (__HAL_CAN_GET_FLAG(&hcan1, CAN_FLAG_BOF)) {
-                rt_kprintf("[CAN_TEST] Bus-Off detected, recovering...\n");
-                HAL_CAN_Stop(&hcan1);
-                rt_thread_mdelay(20);
-
-                /* Re-init filter (HAL_CAN_Start doesn't restore filters) */
-                CAN_FilterTypeDef filter = {0};
-                filter.FilterBank = 0;
-                filter.FilterMode = CAN_FILTERMODE_IDMASK;
-                filter.FilterScale = CAN_FILTERSCALE_32BIT;
-                filter.FilterIdHigh = 0x0000;
-                filter.FilterIdLow = 0x0000;
-                filter.FilterMaskIdHigh = 0x0000;
-                filter.FilterMaskIdLow = 0x0000;
-                filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-                filter.FilterActivation = ENABLE;
-                HAL_CAN_ConfigFilter(&hcan1, &filter);
-
-                HAL_CAN_Start(&hcan1);
-                HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
-                rt_kprintf("[CAN_TEST] Bus-Off recovery complete\n");
-            }
-        }
-
-        count++;
-        rt_thread_mdelay(interval_ms);
-    }
-    rt_kprintf("[CAN_TEST] Stopped after %d frames\n", count);
-}
-
-static int can_test_start(int argc, char **argv)
-{
-    rt_uint32_t interval = 200; /* default 200ms */
-
-    if (g_test_running) {
-        rt_kprintf("[CAN_TEST] Already running!\n");
-        return 0;
-    }
-
-    if (argc >= 2) {
-        interval = atoi(argv[1]);
-        if (interval < 5) interval = 5;
-        if (interval > 10000) interval = 10000;
-    }
-
-    g_test_running = 1;
-    g_test_thread = rt_thread_create("cantest", can_test_entry,
-                                      (void *)(rt_ubase_t)interval,
-                                      1024, 12, 10);
-    if (g_test_thread) {
-        rt_thread_startup(g_test_thread);
-    }
-    return 0;
-}
-MSH_CMD_EXPORT(can_test_start, Start CAN test: can_test_start [interval_ms]);
-
-static int can_test_stop(int argc, char **argv)
-{
-    (void)argc; (void)argv;
-    if (!g_test_running) {
-        rt_kprintf("[CAN_TEST] Not running\n");
-        return 0;
-    }
-    g_test_running = 0;
-    if (g_test_thread) {
-        rt_thread_delete(g_test_thread);
-        g_test_thread = RT_NULL;
-    }
-    return 0;
-}
-MSH_CMD_EXPORT(can_test_stop, Stop CAN test);
-
-static void can_test_auto_start(rt_uint32_t interval_ms)
-{
-    if (g_test_running) return;
-    g_test_running = 1;
-    g_test_thread = rt_thread_create("cantest", can_test_entry,
-                                      (void *)(rt_ubase_t)interval_ms,
-                                      1024, 12, 10);
-    if (g_test_thread) {
-        rt_thread_startup(g_test_thread);
-    }
-}

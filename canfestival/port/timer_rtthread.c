@@ -1,18 +1,12 @@
-/* Prevent GCC14 newlib signal.h conflict with RT-Thread libc_signal.h */
+/* 避免 GCC14 newlib signal.h 与 RT-Thread libc_signal.h 冲突 */
 #define _SIGNAL_H_
 
 #include <rtthread.h>
 #include "timer_rtthread.h"
 #include "timerscfg.h"
-#include "timers.h"              /* for TimeDispatch() */
-#include "can_driver.h"          /* for canReceive() */
-#include "states.h"              /* for canDispatch() */
-#include "pdo.h"                 /* for sendPDOevent() */
-/* Master_Data is declared in applications/canopen_master.h */
-extern CO_Data Master_Data;
+#include "timers.h"              /* TimeDispatch() */
 
 static rt_timer_t g_timer = RT_NULL;
-static rt_thread_t g_timer_thread = RT_NULL;
 
 TIMEVAL getElapsedTime(void)
 {
@@ -29,7 +23,7 @@ void setTimer(TIMEVAL interval)
 {
     if (g_timer) {
         rt_timer_stop(g_timer);
-        /* Clamp to RT_TICK_MAX/2 - 1 to avoid assertion in rt_timer_start */
+        /* 限制到 RT_TICK_MAX/2 - 1，避免 rt_timer_start 断言 */
         rt_tick_t clamped = (interval < RT_TICK_MAX / 2)
                             ? interval : (RT_TICK_MAX / 2 - 1);
         rt_timer_control(g_timer, RT_TIMER_CTRL_SET_TIME,
@@ -46,7 +40,7 @@ TIMEVAL canDelTimer(TIMEVAL interval)
 
 void TimerInit(void)
 {
-    /* Periodic soft timer to drive CANopen TimeDispatch */
+    /* 周期性软定时器，驱动 CANopen TimeDispatch */
     g_timer = rt_timer_create("cantimer", timer_dispatch,
                               RT_NULL, 10,
                               RT_TIMER_FLAG_PERIODIC |
@@ -62,62 +56,18 @@ void TimerCleanup(void)
     }
 }
 
-/* Empty mutex implementations (single-threaded) */
+/* 当前移植层未使用互斥锁 */
 void EnterMutex(void) { }
 void LeaveMutex(void) { }
 
-/* CAN diagnostics — declared in can_stm32.c */
-extern volatile uint32_t g_can_tx_ok;
-extern volatile uint32_t g_can_tx_err;
-extern volatile uint32_t g_can_rx_cnt;
-
-static void timer_thread_entry(void *param)
-{
-    (void)param;
-    CO_Data *d = &Master_Data;
-    Message msg;
-
-    int loop_cnt = 0;
-    while (1) {
-        /* Process CAN receive frames */
-        while (canReceive((CAN_HANDLE)1, &msg)) {
-            canDispatch(d, &msg);
-        }
-        /* Ensure PDOs are enabled */
-        if (!d->CurrentCommunicationState.csPDO) {
-            d->CurrentCommunicationState.csPDO = 1;
-            rt_kprintf("[PDO] csPDO was 0, forcing to 1\n");
-        }
-        /* Fire event-driven TPDOs (type 0xFE/0xFF) on OD variable change */
-        sendPDOevent(d);
-        if (++loop_cnt % 1000 == 0)
-            rt_kprintf("[CAN] loop #%d, tx=%lu err=%lu rx=%lu csPDO=%d\n",
-                       loop_cnt,
-                       (unsigned long)g_can_tx_ok,
-                       (unsigned long)g_can_tx_err,
-                       (unsigned long)g_can_rx_cnt,
-                       d->CurrentCommunicationState.csPDO);
-        rt_thread_mdelay(5);
-    }
-}
-
 void StartTimerLoop(void (*callback)(CO_Data *, UNS32))
 {
-    (void)callback;     /* no longer used — we use TimeDispatch directly */
+    (void)callback;
     TimerInit();
-    g_timer_thread = rt_thread_create("cantloop", timer_thread_entry,
-                                       RT_NULL, 1024, 8, 10);
-    if (g_timer_thread) {
-        rt_thread_startup(g_timer_thread);
-    }
 }
 
 void StopTimerLoop(void (*callback)(CO_Data *, UNS32))
 {
     (void)callback;
-    if (g_timer_thread) {
-        rt_thread_delete(g_timer_thread);
-        g_timer_thread = RT_NULL;
-    }
     TimerCleanup();
 }

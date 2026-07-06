@@ -9,7 +9,7 @@
  *   写: Modbus -> usSRegHoldBuf[] -> reg_write_async() -> CANopen 本地对象字典
  */
 #include "user_mb_app.h"
-#include "../../../applications/reg_router.h"
+#include "../../../applications/protocol/reg_router.h"
 #include <string.h>
 
 #define DBG_TAG "modbus"

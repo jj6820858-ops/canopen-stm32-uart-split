@@ -1,8 +1,16 @@
 SRC_FILES :=
 # Application layer
-SRC_FILES +=$(BSP_ROOT)/applications/main.c
-SRC_FILES +=$(BSP_ROOT)/applications/reg_router.c
-SRC_FILES +=$(BSP_ROOT)/applications/canopen_master.c
+SRC_FILES +=$(BSP_ROOT)/applications/core/main.c
+SRC_FILES +=$(BSP_ROOT)/applications/threads/app_thread.c
+SRC_FILES +=$(BSP_ROOT)/applications/canopen/canopen_master.c
+SRC_FILES +=$(BSP_ROOT)/applications/protocol/reg_router.c
+SRC_FILES +=$(BSP_ROOT)/applications/protocol/protocol_table.c
+SRC_FILES +=$(BSP_ROOT)/applications/gateway/sampling.c
+SRC_FILES +=$(BSP_ROOT)/applications/workflow/power_on_check.c
+# Test commands
+SRC_FILES +=$(BSP_ROOT)/tests/motor_test.c
+SRC_FILES +=$(BSP_ROOT)/tests/pdo_test.c
+SRC_FILES +=$(BSP_ROOT)/tests/can_test.c
 SRC_FILES +=$(BSP_ROOT)/canfestival/od_master/ObjDict.c
 SRC_FILES +=$(BSP_ROOT)/canfestival/port/can_stm32.c
 SRC_FILES +=$(BSP_ROOT)/canfestival/port/timer_rtthread.c

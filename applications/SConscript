@@ -2,7 +2,29 @@ import os
 from building import *
 
 cwd = GetCurrentDir()
-src = Glob('*.c')
 
-group = DefineGroup('Applications', src, depend=[''])
+app_dirs = [
+    'core',
+    'threads',
+    'canopen',
+    'protocol',
+    'gateway',
+    'workflow',
+]
+
+src = []
+path = []
+
+for item in app_dirs:
+    subdir = os.path.join(cwd, item)
+    src += Glob(os.path.join(item, '*.c'))
+    path.append(subdir)
+
+path += [
+    os.path.normpath(os.path.join(cwd, '..', 'canfestival', 'include')),
+    os.path.normpath(os.path.join(cwd, '..', 'canfestival', 'port')),
+    os.path.normpath(os.path.join(cwd, '..', 'canfestival', 'od_master')),
+]
+
+group = DefineGroup('Applications', src, depend=[''], CPPPATH=path)
 Return('group')

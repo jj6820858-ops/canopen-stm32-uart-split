@@ -12,10 +12,13 @@
 #include <rtthread.h>
 
 #include "canopen_master.h"
+#include "can_driver.h"
 #include "mb.h"
+#include "pdo.h"
 #include "power_on_check.h"
 #include "reg_router.h"
 #include "sampling.h"
+#include "states.h"
 #include "user_mb_app.h"
 
 #define MODBUS_SLAVE_ADDR       CONFIG_MODBUS_SLAVE_ADDR
@@ -27,11 +30,26 @@
 #define MODBUS_THREAD_PRIORITY  18
 #define MODBUS_THREAD_TICK      10
 
+#define CANOPEN_POLL_MS         5
+#define CANOPEN_THREAD_STACK    1024
+#define CANOPEN_THREAD_PRIORITY 8
+#define CANOPEN_THREAD_TICK     10
+
+#define CAN_TEST_THREAD_STACK     1024
+#define CAN_TEST_THREAD_PRIORITY  12
+#define CAN_TEST_THREAD_TICK      10
+
 /* PC0: 电源控制输出，高电平使能 */
 #define PWR_CTRL_PORT           GPIOC
 #define PWR_CTRL_PIN            GPIO_PIN_0
 
+extern volatile uint32_t g_can_tx_ok;
+extern volatile uint32_t g_can_tx_err;
+extern volatile uint32_t g_can_rx_cnt;
+
+static rt_thread_t g_canopen_thread = RT_NULL;
 static rt_thread_t g_modbus_thread = RT_NULL;
+static rt_thread_t g_can_test_thread = RT_NULL;
 
 static void pwr_ctrl_init(void)
 {
@@ -54,6 +72,53 @@ static void modbus_thread_entry(void *parameter)
         eMBPoll();
         rt_thread_mdelay(MODBUS_POLL_MS);
     }
+}
+
+static void canopen_thread_entry(void *parameter)
+{
+    CO_Data *data = &Master_Data;
+    Message msg;
+    int loop_count = 0;
+
+    (void)parameter;
+
+    while (1) {
+        while (canReceive((CAN_HANDLE)1, &msg)) {
+            canDispatch(data, &msg);
+        }
+
+        if (!data->CurrentCommunicationState.csPDO) {
+            data->CurrentCommunicationState.csPDO = 1;
+            rt_kprintf("[PDO] csPDO 为 0，已强制打开\n");
+        }
+
+        sendPDOevent(data);
+
+        if (++loop_count % 1000 == 0) {
+            rt_kprintf("[CAN] loop #%d, tx=%lu err=%lu rx=%lu csPDO=%d\n",
+                       loop_count,
+                       (unsigned long)g_can_tx_ok,
+                       (unsigned long)g_can_tx_err,
+                       (unsigned long)g_can_rx_cnt,
+                       data->CurrentCommunicationState.csPDO);
+        }
+
+        rt_thread_mdelay(CANOPEN_POLL_MS);
+    }
+}
+
+static int canopen_thread_start(void)
+{
+    g_canopen_thread = rt_thread_create("cantloop", canopen_thread_entry, RT_NULL,
+                                        CANOPEN_THREAD_STACK,
+                                        CANOPEN_THREAD_PRIORITY,
+                                        CANOPEN_THREAD_TICK);
+    if (g_canopen_thread == RT_NULL) {
+        rt_kprintf("CANopen 轮询线程创建失败\n");
+        return -RT_ENOMEM;
+    }
+
+    return rt_thread_startup(g_canopen_thread);
 }
 
 static int modbus_thread_start(void)
@@ -85,6 +150,31 @@ static int modbus_thread_start(void)
     return rt_thread_startup(g_modbus_thread);
 }
 
+int app_thread_can_test_start(void (*entry)(void *parameter), void *parameter)
+{
+    if (g_can_test_thread != RT_NULL) {
+        return -RT_EBUSY;
+    }
+
+    g_can_test_thread = rt_thread_create("cantest", entry, parameter,
+                                         CAN_TEST_THREAD_STACK,
+                                         CAN_TEST_THREAD_PRIORITY,
+                                         CAN_TEST_THREAD_TICK);
+    if (g_can_test_thread == RT_NULL) {
+        return -RT_ENOMEM;
+    }
+
+    return rt_thread_startup(g_can_test_thread);
+}
+
+void app_thread_can_test_stop(void)
+{
+    if (g_can_test_thread != RT_NULL) {
+        rt_thread_delete(g_can_test_thread);
+        g_can_test_thread = RT_NULL;
+    }
+}
+
 int app_thread_init(void)
 {
     int ret;
@@ -96,6 +186,11 @@ int app_thread_init(void)
     canopen_master_init();
     power_on_check_init();
     sampling_init();
+
+    ret = canopen_thread_start();
+    if (ret != RT_EOK) {
+        return ret;
+    }
 
     ret = modbus_thread_start();
     if (ret != RT_EOK) {

@@ -4,8 +4,17 @@ from building import *
 cwd = GetCurrentDir()
 src = Glob('*.c')
 
+app_root = os.path.normpath(os.path.join(cwd, '..', 'applications'))
+canfestival_root = os.path.normpath(os.path.join(cwd, '..', 'canfestival'))
 path = [
-    os.path.normpath(os.path.join(cwd, '..', 'applications')),
+    os.path.join(app_root, 'canopen'),
+    os.path.join(app_root, 'protocol'),
+    os.path.join(app_root, 'gateway'),
+    os.path.join(app_root, 'workflow'),
+    os.path.join(app_root, 'threads'),
+    os.path.join(canfestival_root, 'include'),
+    os.path.join(canfestival_root, 'port'),
+    os.path.join(canfestival_root, 'od_master'),
 ]
 
 group = DefineGroup('Tests', src, depend=[''], CPPPATH=path)
