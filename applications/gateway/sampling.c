@@ -72,6 +72,9 @@ const int32_t slot_positions[SLOT_COUNT] = {
 #define R_MODE       9     /* 0x0009 模式 */
 #define R_TURNT_FN   10    /* 0x000A 转盘功能 */
 #define R_MOTOR      11    /* 0x000B 电机控制 */
+#define R_TURNT_POS0 12    /* 0x000C 转盘指定位号 [3reg]，按成品上位机实测帧地址 */
+#define R_TURNT_POS1 13
+#define R_TURNT_POS2 14
 #define R_LIGHT      15    /* 0x000F 光强 */
 #define R_DEV_STAT   17    /* 0x0011 设备状态 */
 #define R_COOLING    14    /* 0x000E 酶孔位制冷 (Modbus 00015) */
@@ -85,6 +88,97 @@ const int32_t slot_positions[SLOT_COUNT] = {
 /* ── 当前选中的孔位索引 (0~6), 由上位机写模式寄存器间接选择 ── */
 static int g_cur_slot = 0;
 static int g_hole_written = 0;  /* 上位机已写孔位，禁止CAN覆盖 */
+static uint16_t g_operate_bitmap = 0;
+static uint16_t g_turntable_pos[3] = {0};
+static uint8_t g_turntable_pos_mask = 0;
+
+static int proto_first_set_bit(uint16_t word)
+{
+    for (int bit = 0; bit < 16; bit++) {
+        if (word & (uint16_t)(0x8000u >> bit)) {
+            return bit;
+        }
+    }
+
+    return -1;
+}
+
+static int slot_from_turntable_bitmap(void)
+{
+    for (int word = 0; word < 3; word++) {
+        int bit = proto_first_set_bit(g_turntable_pos[word]);
+
+        if (bit >= 0) {
+            int global_bit = word * 16 + bit;
+
+            if (global_bit < 5) {
+                return global_bit % SLOT_COUNT;          /* 试剂位 */
+            }
+            if (global_bit < 23) {
+                return (global_bit - 5) % SLOT_COUNT;    /* 样品位 */
+            }
+            if (global_bit < 41) {
+                return (global_bit - 23) % SLOT_COUNT;   /* 比色皿位 */
+            }
+            return 0;
+        }
+    }
+
+    return g_cur_slot;
+}
+
+static int turntable_pos_write(uint16_t addr, uint16_t value)
+{
+    if (addr < R_TURNT_POS0 || addr > R_TURNT_POS2) {
+        return 0;
+    }
+
+    /*
+     * 成品上位机用 FC10 连续写 0x000C~0x000E 作为转盘目标位图。
+     * 单独写 0x000E 时仍保留给制冷控制，因此只有检测到连续目标位图写入
+     * 时才拦截 0x000E，避免误关制冷。
+     */
+    if (addr == R_TURNT_POS2 && g_turntable_pos_mask == 0) {
+        return 0;
+    }
+
+    if (addr == R_TURNT_POS0) {
+        memset(g_turntable_pos, 0, sizeof(g_turntable_pos));
+    }
+
+    g_turntable_pos[addr - R_TURNT_POS0] = value;
+    g_turntable_pos_mask |= (uint8_t)(1u << (addr - R_TURNT_POS0));
+    g_cur_slot = slot_from_turntable_bitmap();
+
+    if (g_turntable_pos_mask == 0x07) {
+        g_turntable_pos_mask = 0;
+    }
+
+    LOG_D("Turntable target: %04X %04X %04X -> slot %d",
+          g_turntable_pos[0], g_turntable_pos[1], g_turntable_pos[2],
+          g_cur_slot);
+    return 1;
+}
+
+static void turntable_apply_function(uint16_t value)
+{
+    uint8_t mode = (uint8_t)(value >> 8);
+
+    mT_modes = (INTEGER8)mode;
+
+    if (mode & 0x80) {
+        TEMP_control_word |= 0x0001;       /* 加热使能 */
+        if (heating_target == 0) {
+            heating_target = 2500;         /* 默认 25.00°C */
+        }
+    }
+
+    if (mode & 0x04) {
+        photometer_ch0 = 0x0018;           /* 读光强/测量窗口 */
+    }
+
+    LOG_D("Turntable fn: word=0x%04X mode=0x%02X", value, mode);
+}
 
 /* ═══════════════════════════════════════════════════════════════
  *  Modbus 寄存器 ← CAN TPDO 同步
@@ -183,6 +277,14 @@ sync_sensors:
  * ═══════════════════════════════════════════════════════════════ */
 void sampling_on_reg_write(uint16_t addr, uint16_t value)
 {
+    if (addr != R_TURNT_POS0 && addr != R_TURNT_POS1 && addr != R_TURNT_POS2) {
+        g_turntable_pos_mask = 0;
+    }
+
+    if (turntable_pos_write(addr, value)) {
+        goto send_pdo;
+    }
+
     switch (addr) {
 
     /* ── 0x000B: 电机控制 ── */
@@ -203,6 +305,11 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
             photometer_ch0  = 0x0018; /* 测量模式 */
             LOG_D("Motor: GO → slot %d (pos=%ld)", g_cur_slot,
                   (long)slot_positions[g_cur_slot]);
+            break;
+
+        case 0xA000:  /* 成品上位机用于运动后的保持/确认 */
+            mT_control_word = 0;
+            LOG_D("Motor: HOLD");
             break;
 
         case 0xC000:  /* 回零 */
@@ -265,26 +372,15 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
     /* ── 0x0009: 模式选择 ── */
     case R_MODE:
         /*
-         * 上位机写的模式值 → 影响 RPDO2 控制字或选择孔位
+         * 上位机写的操作位号，后续动作命令会引用它。
          */
-        LOG_D("Mode: 0x%04X", value);
+        g_operate_bitmap = value;
+        LOG_D("Operate bitmap: 0x%04X", g_operate_bitmap);
         break;
 
     /* ── 0x000A: 转盘功能/电机控制 ── */
     case R_TURNT_FN:
-        if (value == 0x8000) {
-            /* 上位机写 0x8000 = 停电机 */
-            mT_position = 0;
-            mT_control_word = 0;
-            mT_modes = 0;
-            LOG_I("Motor: STOP (via 0x000B)");
-        } else if (value == 0x9000) {
-            /* 上位机写 0x9000 = 启动电机 */
-            LOG_I("Motor: START (via 0x000B)");
-        } else {
-            mT_modes = (INTEGER8)(value & 0xFF);
-            LOG_D("Turntable fn: 0x%02X", value);
-        }
+        turntable_apply_function(value);
         break;
 
     /* ── 0x0077: 参数控制 ── */
@@ -347,6 +443,7 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
         }
         break;
     }
+send_pdo:
     /* OD 变量已改，立即触发 PDO 发送 */
     sendPDOevent(&Master_Data);
 }
