@@ -16,11 +16,17 @@ except Exception:  # pragma: no cover - GUI shows the install hint.
     serial = None
     list_ports = None
 
-from modbus_codec import append_crc, decode_frame, parse_hex_string
+from modbus_codec import append_crc, crc16_modbus, decode_frame, parse_hex_string
 
 
 DEFAULT_BAUDRATE = 115200
 DEFAULT_FRAME_GAP_MS = 20
+DEFAULT_SLAVE_ID = 1
+DEFAULT_COLLECT_INTERVAL_S = 2.0
+PROBE_FUNCTION = 0x03
+PROBE_REGISTER = 0x0011
+PROBE_QUANTITY = 2
+PROBE_TIMEOUT_S = 1.2
 
 
 def port_sort_key(device: str) -> tuple[int, int | str]:
@@ -35,6 +41,64 @@ def port_display_name(device: str, description: str = "") -> str:
     if description and description != device:
         return f"{device} - {description}"
     return device
+
+
+def build_read_request(
+    slave_id: int,
+    start_addr: int = PROBE_REGISTER,
+    quantity: int = PROBE_QUANTITY,
+    function: int = PROBE_FUNCTION,
+) -> bytes:
+    if not 1 <= slave_id <= 247:
+        raise ValueError("站号范围应为 1~247")
+    if function not in (0x03, 0x04):
+        raise ValueError("在线检测只支持只读功能码 0x03/0x04")
+    if not 0 <= start_addr <= 0xFFFF:
+        raise ValueError("起始寄存器范围应为 0~65535")
+    if not 1 <= quantity <= 125:
+        raise ValueError("读取数量范围应为 1~125")
+
+    payload = bytes(
+        (
+            slave_id,
+            function,
+            (start_addr >> 8) & 0xFF,
+            start_addr & 0xFF,
+            (quantity >> 8) & 0xFF,
+            quantity & 0xFF,
+        )
+    )
+    return append_crc(payload)
+
+
+def frame_crc_ok(frame: bytes) -> bool:
+    if len(frame) < 4:
+        return False
+    wire_crc = frame[-2] | (frame[-1] << 8)
+    return wire_crc == crc16_modbus(frame[:-2])
+
+
+def analyze_probe_response(frame: bytes, slave_id: int, function: int, quantity: int) -> tuple[bool, bool, str]:
+    if len(frame) < 2 or frame[0] != slave_id:
+        return False, False, ""
+
+    if frame[1] not in (function, function | 0x80):
+        return False, False, ""
+
+    if not frame_crc_ok(frame):
+        return True, False, "收到响应但 CRC 错误"
+
+    if frame[1] == (function | 0x80):
+        code = frame[2] if len(frame) >= 5 else 0
+        return True, True, f"设备在线，但返回异常码 0x{code:02X}"
+
+    expected_bytes = quantity * 2
+    if len(frame) < 5:
+        return True, False, "响应长度不足"
+    if frame[2] != expected_bytes:
+        return True, True, f"设备在线，数据长度异常 标称:{frame[2]} 期望:{expected_bytes}"
+
+    return True, True, "设备在线，收到状态寄存器数据"
 
 
 class SerialReader(threading.Thread):
@@ -124,10 +188,16 @@ class ModbusHostApp:
         self.reader: SerialReader | None = None
         self.rows: list[dict[str, str]] = []
         self.port_display_to_device: dict[str, str] = {}
+        self.pending_probes: list[dict[str, float | int | str]] = []
+        self.collecting = False
+        self.next_collect_time = 0.0
 
         self.port_var = tk.StringVar()
         self.baud_var = tk.StringVar(value=str(DEFAULT_BAUDRATE))
         self.gap_var = tk.StringVar(value=str(DEFAULT_FRAME_GAP_MS))
+        self.slave_var = tk.StringVar(value=str(DEFAULT_SLAVE_ID))
+        self.collect_interval_var = tk.StringVar(value=f"{DEFAULT_COLLECT_INTERVAL_S:g}")
+        self.online_status_var = tk.StringVar(value="未检测")
         self.append_crc_var = tk.BooleanVar(value=True)
         self.status_var = tk.StringVar(value="未连接")
         self.send_var = tk.StringVar()
@@ -167,6 +237,28 @@ class ModbusHostApp:
         self.connect_button.grid(row=0, column=7, padx=(0, 8))
         ttk.Button(toolbar, text="清空", command=self.clear_log).grid(row=0, column=8, padx=(0, 8))
         ttk.Button(toolbar, text="保存CSV", command=self.save_csv).grid(row=0, column=9)
+
+        detect_bar = ttk.Frame(toolbar)
+        detect_bar.grid(row=1, column=0, columnspan=10, sticky="ew", pady=(8, 0))
+        detect_bar.columnconfigure(9, weight=1)
+
+        ttk.Label(detect_bar, text="站号").grid(row=0, column=0, sticky="w")
+        ttk.Spinbox(detect_bar, from_=1, to=247, textvariable=self.slave_var, width=6).grid(row=0, column=1, padx=(6, 12))
+        ttk.Button(detect_bar, text="在线检测", command=self.detect_online).grid(row=0, column=2, padx=(0, 12))
+
+        ttk.Label(detect_bar, text="采集间隔s").grid(row=0, column=3)
+        ttk.Spinbox(
+            detect_bar,
+            from_=0.5,
+            to=60,
+            increment=0.5,
+            textvariable=self.collect_interval_var,
+            width=7,
+        ).grid(row=0, column=4, padx=(6, 12))
+        self.collect_button = ttk.Button(detect_bar, text="自动采集", command=self.toggle_collect)
+        self.collect_button.grid(row=0, column=5, padx=(0, 12))
+        ttk.Label(detect_bar, text="检测状态").grid(row=0, column=6)
+        ttk.Label(detect_bar, textvariable=self.online_status_var).grid(row=0, column=7, sticky="w", padx=(6, 0))
 
         main = ttk.PanedWindow(self.root, orient=tk.VERTICAL)
         main.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 8))
@@ -286,11 +378,140 @@ class ModbusHostApp:
         self.status_var.set("正在连接...")
 
     def disconnect(self) -> None:
+        self.collecting = False
+        self.collect_button.configure(text="自动采集")
+        self.pending_probes.clear()
         if self.reader is not None:
             self.reader.stop()
             self.reader = None
         self.connect_button.configure(text="连接")
         self.status_var.set("正在断开...")
+
+    def _parse_slave_id(self) -> int:
+        slave_id = int(self.slave_var.get())
+        if not 1 <= slave_id <= 247:
+            raise ValueError("站号范围应为 1~247")
+        return slave_id
+
+    def _parse_collect_interval(self) -> float:
+        interval = float(self.collect_interval_var.get())
+        if interval < 0.5:
+            raise ValueError("采集间隔不能小于 0.5 秒")
+        return interval
+
+    def detect_online(self) -> None:
+        if self.reader is None:
+            messagebox.showwarning("未连接", "请先连接串口")
+            return
+        self._send_probe("在线检测")
+
+    def toggle_collect(self) -> None:
+        if self.collecting:
+            self.collecting = False
+            self.collect_button.configure(text="自动采集")
+            self.online_status_var.set("自动采集已停止")
+            return
+
+        if self.reader is None:
+            messagebox.showwarning("未连接", "请先连接串口")
+            return
+
+        try:
+            self._parse_slave_id()
+            self._parse_collect_interval()
+        except ValueError as exc:
+            messagebox.showwarning("参数错误", str(exc))
+            return
+
+        self.collecting = True
+        self.next_collect_time = 0.0
+        self.collect_button.configure(text="停止采集")
+        self.online_status_var.set("自动采集已启动")
+
+    def _send_probe(self, source: str) -> bool:
+        if self.reader is None:
+            self.online_status_var.set("串口未连接")
+            return False
+
+        try:
+            slave_id = self._parse_slave_id()
+            frame = build_read_request(slave_id)
+            self.reader.write(frame)
+        except Exception as exc:
+            self.online_status_var.set(f"{source}发送失败: {exc}")
+            return False
+
+        now = time.monotonic()
+        self.pending_probes.append(
+            {
+                "source": source,
+                "slave_id": slave_id,
+                "function": PROBE_FUNCTION,
+                "quantity": PROBE_QUANTITY,
+                "deadline": now + PROBE_TIMEOUT_S,
+            }
+        )
+        self._add_frame("TX", frame)
+        self.online_status_var.set(f"{source}中，等待响应...")
+        return True
+
+    def _auto_collect_tick(self) -> None:
+        if not self.collecting:
+            return
+        if self.reader is None:
+            self.collecting = False
+            self.collect_button.configure(text="自动采集")
+            self.online_status_var.set("串口断开，自动采集已停止")
+            return
+
+        now = time.monotonic()
+        if now < self.next_collect_time:
+            return
+        if any(item["source"] == "自动采集" for item in self.pending_probes):
+            return
+
+        try:
+            interval = self._parse_collect_interval()
+        except ValueError as exc:
+            self.collecting = False
+            self.collect_button.configure(text="自动采集")
+            self.online_status_var.set(str(exc))
+            return
+
+        self._send_probe("自动采集")
+        self.next_collect_time = now + interval
+
+    def _check_probe_timeouts(self) -> None:
+        if not self.pending_probes:
+            return
+
+        now = time.monotonic()
+        active = []
+        for item in self.pending_probes:
+            if now >= float(item["deadline"]):
+                self.online_status_var.set(f"{item['source']}超时: {PROBE_TIMEOUT_S:g}s 内无响应")
+            else:
+                active.append(item)
+        self.pending_probes = active
+
+    def _handle_probe_response(self, data: bytes) -> None:
+        if not self.pending_probes:
+            return
+
+        active = []
+        for item in self.pending_probes:
+            matched, online, message = analyze_probe_response(
+                data,
+                int(item["slave_id"]),
+                int(item["function"]),
+                int(item["quantity"]),
+            )
+            if matched:
+                prefix = "在线" if online else "异常"
+                self.online_status_var.set(f"{item['source']}: {prefix} - {message}")
+            else:
+                active.append(item)
+        self.pending_probes = active
 
     def send_hex(self) -> None:
         if self.reader is None:
@@ -322,7 +543,12 @@ class ModbusHostApp:
                 if event[1].startswith("串口已断开") or event[1].startswith("打开串口失败"):
                     self.reader = None
                     self.connect_button.configure(text="连接")
+                    self.collecting = False
+                    self.collect_button.configure(text="自动采集")
+                    self.pending_probes.clear()
 
+        self._check_probe_timeouts()
+        self._auto_collect_tick()
         self.root.after(50, self._poll_events)
 
     def _add_frame(self, direction: str, data: bytes) -> None:
@@ -343,6 +569,8 @@ class ModbusHostApp:
         item_id = self.tree.insert("", tk.END, values=tuple(row[key] for key in row))
         self.tree.see(item_id)
         self.tree.selection_set(item_id)
+        if direction == "RX":
+            self._handle_probe_response(data)
 
     def show_selected_detail(self, _event=None) -> None:
         selected = self.tree.selection()
