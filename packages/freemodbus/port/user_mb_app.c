@@ -1,25 +1,22 @@
 /*
- * FreeModbus Libary: user callback functions - 快检设备 protocol
- * Bridges Modbus requests to CANopen local OD via reg_router.
+ * FreeModbus 用户回调 - 快检设备协议
  *
- * Copyright (C) 2013 Armink <armink.ztl@gmail.com>
- * Modifications for 快检设备 protocol (2026)
+ * Modbus 请求通过 reg_router 转接到 CANopen 本地对象字典。
  *
- * Data flow:
- *   READ:  Modbus ← reg_read() → CANopen local OD (getODentry)
- *          Falls back to usSRegHoldBuf[] if no route / OD error.
- *   WRITE: Modbus → usSRegHoldBuf[] (immediate)
- *          → reg_write_async() → CANopen local OD (setODentry)
+ * 数据流:
+ *   读: Modbus -> reg_read() -> CANopen 本地对象字典
+ *       路由失败时回退到 usSRegHoldBuf[]。
+ *   写: Modbus -> usSRegHoldBuf[] -> reg_write_async() -> CANopen 本地对象字典
  */
 #include "user_mb_app.h"
-#include <reg_router.h>
+#include "../../../applications/reg_router.h"
 #include <string.h>
 
 #define DBG_TAG "modbus"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
-/*------------------------Slave mode buffers (unused, keep for compilation)------*/
+/* 从机模式缓冲区: 当前协议不用线圈/离散量，但保留以满足 FreeModbus 编译 */
 USHORT   usSDiscInStart                               = S_DISCRETE_INPUT_START;
 UCHAR    ucSDiscInBuf[1]                               = {0};
 USHORT   usSCoilStart                                  = S_COIL_START;
@@ -29,21 +26,15 @@ USHORT   usSRegInBuf[1]                                = {0};
 USHORT   usSRegHoldStart                               = S_REG_HOLDING_START;
 USHORT   usSRegHoldBuf[S_REG_HOLDING_NREGS]            = {0};
 
-/* Helper: convert usAddress (1-based) to 0-based offset for reg_router */
+/* 将 FreeModbus 的 1 起始地址转换为 reg_router 使用的 0 起始地址 */
 #define ADDR_TO_OFFSET(a)  ((a) - 1)
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Holding Register callback
+/*
+ * 保持寄存器回调
  *
- * Maps Modbus holding register reads/writes to CANopen via reg_router.
- * Falls back to local usSRegHoldBuf when CANopen is unavailable (testing).
- * Addresses are 1-based, matching the 快检设备 protocol spec.
- *
- * Protocol register map:
- *   00001~00033  - Control & Status
- *   00100~00104  - Real-time Data
- *   00120~00198  - Parameter Settings
- * ════════════════════════════════════════════════════════════════════════════ */
+ * 地址按协议文档使用 1 起始，进入 reg_router 前会转换为 0 起始。
+ * 当路由不可用时，读操作回退到本地 usSRegHoldBuf[]，便于离线测试。
+ */
 eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
                              USHORT usNRegs, eMBRegisterMode eMode)
 {
@@ -53,10 +44,10 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
           (eMode == MB_REG_READ) ? "READ" : "WRITE",
           usAddress, usNRegs);
 
-    /* Convert 1-based to 0-based */
+    /* 1 起始转 0 起始 */
     usAddress--;
 
-    /* Validate range */
+    /* 范围检查 */
     if (usAddress + usNRegs > S_REG_HOLDING_NREGS) {
         LOG_E("OUT OF RANGE: addr=%d n=%d max=%d",
               usAddress + 1, usNRegs, S_REG_HOLDING_NREGS);
@@ -71,7 +62,7 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
             LOG_D("RD addr=%d cnt=%d (OD sync %dB)", usAddress + 1, usNRegs, ret);
             break;
         }
-        /* Fallback: read from local buffer */
+        /* 路由失败时读取本地缓存 */
         LOG_D("RD addr=%d cnt=%d (local buffer)", usAddress + 1, usNRegs);
         for (i = 0; i < usNRegs; i++) {
             pucRegBuffer[i * 2]     = (UCHAR)(usSRegHoldBuf[usAddress + i] >> 8);
@@ -88,7 +79,7 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
             usSRegHoldBuf[usAddress + i] = (pSrc[0] << 8) | pSrc[1];
             pSrc += 2;
         }
-        /* Sync to CANopen OD (non-blocking) */
+        /* 非阻塞同步到 CANopen 对象字典 */
         if (reg_write_async(usAddress, usNRegs, pucRegBuffer, NULL) != 0) {
             LOG_W("CANopen OD write failed");
         }
@@ -103,26 +94,20 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress,
     return eStatus;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Input Register callback  (not used in this protocol)
- * ════════════════════════════════════════════════════════════════════════════ */
+/* 输入寄存器回调: 本协议未使用 */
 eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs)
 {
     return MB_ENOREG;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Coils callback  (not used in this protocol)
- * ════════════════════════════════════════════════════════════════════════════ */
+/* 线圈回调: 本协议未使用 */
 eMBErrorCode eMBRegCoilsCB(UCHAR *pucRegBuffer, USHORT usAddress,
                            USHORT usNCoils, eMBRegisterMode eMode)
 {
     return MB_ENOREG;
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Discrete Inputs callback  (not used in this protocol)
- * ════════════════════════════════════════════════════════════════════════════ */
+/* 离散输入回调: 本协议未使用 */
 eMBErrorCode eMBRegDiscreteCB(UCHAR *pucRegBuffer, USHORT usAddress,
                               USHORT usNDiscrete)
 {

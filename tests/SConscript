@@ -1,0 +1,12 @@
+import os
+from building import *
+
+cwd = GetCurrentDir()
+src = Glob('*.c')
+
+path = [
+    os.path.normpath(os.path.join(cwd, '..', 'applications')),
+]
+
+group = DefineGroup('Tests', src, depend=[''], CPPPATH=path)
+Return('group')

@@ -6,7 +6,7 @@
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
 
-/* Directly accessed by CANfestival via CO_Data struct pointers */
+/* CANfestival 通过 CO_Data 回调直接访问这些对象字典变量 */
 extern UNS16 Master_obj1017;
 extern UNS8  Master_highestSubIndex_obj1016;
 extern UNS32 Master_obj1016[];
@@ -15,10 +15,10 @@ void TestMaster_initialisation(CO_Data *d)
 {
     int i;
 
-    /* Enable master heartbeat: 1000ms on COB-ID 0x700 */
+    /* 主站心跳周期: 1000ms, COB-ID 0x700 */
     Master_obj1017 = 1000;
 
-    /* Monitor slaves 1~8 heartbeat (3s timeout each) */
+    /* 监控 1~8 号从站心跳，每个从站 3s 超时 */
     Master_highestSubIndex_obj1016 = 8;
     for (i = 0; i < 8; i++) {
         Master_obj1016[i] = ((UNS32)(i + 1) << 16) | 0x0BB8;  /* nodeId | 3000ms */
@@ -49,14 +49,15 @@ void TestMaster_stopped(CO_Data *d)
 void TestMaster_post_sync(CO_Data *d)
 {
     (void)d;
-    reg_od_sync_in();            /* OD vars → Modbus regs */
-    sampling_sync_can_to_modbus();  /* CAN TPDO → hole encoding + sensors */
+    reg_od_sync_in();               /* 对象字典变量 -> Modbus 寄存器 */
+    sampling_sync_can_to_modbus();  /* CAN TPDO -> 孔位编码与传感器 */
 }
 
 void TestMaster_post_TPDO(CO_Data *d)
 {
     (void)d;
-    reg_od_sync_in();   /* Sync OD vars → Modbus regs after TPDO send */
+    reg_od_sync_in();               /* 对象字典变量 -> Modbus 寄存器 */
+    sampling_sync_can_to_modbus();  /* CAN TPDO -> 孔位编码、传感器与状态保护 */
 }
 
 void TestMaster_heartbeatError(CO_Data *d, UNS8 hbID)

@@ -11,6 +11,14 @@
 #ifndef __BOARD_H__
 #define __BOARD_H__
 
+#ifndef STM32F103xE
+#define STM32F103xE
+#endif
+
+#ifndef USE_HAL_DRIVER
+#define USE_HAL_DRIVER
+#endif
+
 #include <stm32f1xx.h>
 #include <drv_common.h>
 

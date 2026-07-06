@@ -21,6 +21,7 @@
 #include "sampling.h"
 #include "reg_router.h"
 #include "canopen_master.h"
+#include "pdo.h"              /* 触发 PDO 发送 */
 #include <rtthread.h>
 #include <string.h>
 
@@ -45,6 +46,8 @@ extern UNS32    current_heating;      /* Node8 ch1 → Modbus 0x0063 */
 extern UNS32    current_refrigeration;/* Node8 ch2 → Modbus 0x0064 */
 extern UNS32    heating_target;        /* OD 0x201E → PDO 0x207 */
 extern UNS32    refrigeration_target;  /* OD 0x201F → PDO 0x207 */
+extern UNS32    TEMP_control_word;     /* OD 0x201D → PDO 0x307 */
+extern unsigned short usSRegHoldBuf[];      /* FreeModbus 兜底缓存 */
 
 #define DBG_TAG "sample"
 #define DBG_LVL DBG_LOG
@@ -76,9 +79,12 @@ const int32_t slot_positions[SLOT_COUNT] = {
 #define R_COOL       100   /* 0x0064 制冷温度 */
 #define R_PARAM      119   /* 0x0077 参数控制 */
 #define R_WEIGH      120   /* 0x0078 称重控制 */
+#define R_HEAT_TARGET 191  /* 0x00BF 协议 0192 加热目标温度 */
+#define R_COOL_TARGET 192  /* 0x00C0 协议 0193 制冷目标温度 */
 
 /* ── 当前选中的孔位索引 (0~6), 由上位机写模式寄存器间接选择 ── */
 static int g_cur_slot = 0;
+static int g_hole_written = 0;  /* 上位机已写孔位，禁止CAN覆盖 */
 
 /* ═══════════════════════════════════════════════════════════════
  *  Modbus 寄存器 ← CAN TPDO 同步
@@ -86,6 +92,12 @@ static int g_cur_slot = 0;
  * ═══════════════════════════════════════════════════════════════ */
 void sampling_sync_can_to_modbus(void)
 {
+    /* 上位机已主动写入孔位时，跳过 CAN 自动同步 */
+    if (g_hole_written) {
+        /* 只同步传感器数据，跳过孔位 */
+        goto sync_sensors;
+    }
+
     /*
      * CAN TPDO1 Node6 (0x186) → 编码器位置 → 孔位编码
      *
@@ -132,9 +144,10 @@ void sampling_sync_can_to_modbus(void)
         buf[3] = (uint8_t)(hole[1] & 0xFF);
         buf[4] = (uint8_t)(hole[2] >> 8);
         buf[5] = (uint8_t)(hole[2] & 0xFF);
-        reg_write(R_HOLE0, 3, buf);
+        reg_write_local(R_HOLE0, 3, buf);
     }
 
+sync_sensors:
     /* 传感器 → Modbus */
     {
         uint8_t buf[2];
@@ -142,20 +155,21 @@ void sampling_sync_can_to_modbus(void)
         v = (uint16_t)(current_heating & 0xFFFF);
         buf[0] = (uint8_t)(v >> 8);
         buf[1] = (uint8_t)(v & 0xFF);
-        reg_write(R_HEAT, 1, buf);
+        reg_write_local(R_HEAT, 1, buf);
 
         v = (uint16_t)(current_refrigeration & 0xFFFF);
         buf[0] = (uint8_t)(v >> 8);
         buf[1] = (uint8_t)(v & 0xFF);
-        reg_write(R_COOL, 1, buf);
+        reg_write_local(R_COOL, 1, buf);
     }
 
-    /* 设备状态 (固定值) */
+    /* 设备状态 (固定值) — 同时设 OD 变量防止 CANopen sync 覆盖 */
+    mX_status_word = 0x1C00;  /* OD 变量 → reg_od_sync_in 会同步到 regs[17] */
     {
         uint8_t buf[4];
-        buf[0] = 0x10; buf[1] = 0x00;  /* 0x1000 */
-        buf[2] = 0x00; buf[3] = 0x00;  /* 0x0000 */
-        reg_write(R_DEV_STAT, 2, buf);
+        buf[0] = 0x1C; buf[1] = 0x00;  /* 0x1C00 */
+        buf[2] = 0x00; buf[3] = 0x01;  /* 0x0001 */
+        reg_write_local(R_DEV_STAT, 2, buf);
     }
 }
 
@@ -205,6 +219,13 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
         }
         break;
 
+    /* ── 0x0003: 针头清洗/动作触发 ── */
+    case R_NEEDLE:
+        if (value == 0x8000) {
+            LOG_I("Needle: EXECUTE");
+        }
+        break;
+
     /* ── 0x0004: 动作命令 ── */
     case R_ACTION:
         if (value == 0x8000) {
@@ -249,10 +270,21 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
         LOG_D("Mode: 0x%04X", value);
         break;
 
-    /* ── 0x000A: 转盘功能 ── */
+    /* ── 0x000A: 转盘功能/电机控制 ── */
     case R_TURNT_FN:
-        mT_modes = (INTEGER8)(value & 0xFF);
-        LOG_D("Turntable fn: 0x%02X", value);
+        if (value == 0x8000) {
+            /* 上位机写 0x8000 = 停电机 */
+            mT_position = 0;
+            mT_control_word = 0;
+            mT_modes = 0;
+            LOG_I("Motor: STOP (via 0x000B)");
+        } else if (value == 0x9000) {
+            /* 上位机写 0x9000 = 启动电机 */
+            LOG_I("Motor: START (via 0x000B)");
+        } else {
+            mT_modes = (INTEGER8)(value & 0xFF);
+            LOG_D("Turntable fn: 0x%02X", value);
+        }
         break;
 
     /* ── 0x0077: 参数控制 ── */
@@ -267,13 +299,13 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
     /* ── 0x000E: 酶孔位制冷 ── */
     case R_COOLING:
         if (value == 0x0001) {
-            refrigeration_target = 0x6400;  /* 100×100 = 10.0°C, enable */
+            TEMP_control_word |= 0x0002;    /* 使能制冷 */
+            if (refrigeration_target == 0) {
+                refrigeration_target = 1000; /* 默认 10.00°C */
+            }
             LOG_I("Cooling: ON");
-        } else if (value == 0x8000) {
-            /* 上位机写入 0x8000 — 光强触发信号 */
-            photometer_ch0 = 0x0018;
-            LOG_I("Light: TRIGGER (via 0x000F=0x8000)");
         } else {
+            TEMP_control_word &= ~0x0002;
             refrigeration_target = 0;
             LOG_I("Cooling: OFF");
         }
@@ -281,19 +313,24 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
 
     /* ── 0x0010: 光强读数 (只读) ── */
     case R_LIGHT:
-        LOG_D("Light read: 0x%04X", value);
+        if (value == 0x8000) {
+            photometer_ch0 = 0x0018;
+            LOG_I("Light: TRIGGER");
+        } else {
+            LOG_D("Light write/readback: 0x%04X", value);
+        }
         break;
 
-    /* ── 0x0063: 转盘加热目标温度 ── */
-    case R_HEAT:
-        heating_target = ((UNS32)value) * 100;  /* ×100 */
-        LOG_I("Heat target: %d.%d°C", value, value ? 0 : 0);
+    /* ── 0x00BF / 协议 0192: 转盘加热目标温度，值已按 x100 放大 ── */
+    case R_HEAT_TARGET:
+        heating_target = (UNS32)value;
+        LOG_I("Heat target: %d.%02d°C", value / 100, value % 100);
         break;
 
-    /* ── 0x0064: 制冷目标温度 ── */
-    case R_COOL:
-        refrigeration_target = ((UNS32)value) * 100;  /* ×100 */
-        LOG_I("Cool target: %d.%d°C", value, value ? 0 : 0);
+    /* ── 0x00C0 / 协议 0193: 制冷目标温度，值已按 x100 放大 ── */
+    case R_COOL_TARGET:
+        refrigeration_target = (UNS32)value;
+        LOG_I("Cool target: %d.%02d°C", value / 100, value % 100);
         break;
 
     /* ── 0x0078: 称重控制 ── */
@@ -303,8 +340,15 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
         break;
 
     default:
+        /* 上位机写孔位寄存器 0x0001~0x0003，禁止 CAN 覆盖 */
+        if (addr <= 2 && g_hole_written == 0) {
+            g_hole_written = 1;
+            LOG_I("Hole locked by上位机");
+        }
         break;
     }
+    /* OD 变量已改，立即触发 PDO 发送 */
+    sendPDOevent(&Master_Data);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -313,6 +357,7 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
 int sampling_init(void)
 {
     g_cur_slot = 0;
+    g_hole_written = 0;
 
     /* 初始状态: 电机空闲 */
     mT_position     = SLOT_IDLE_POS;
@@ -324,6 +369,24 @@ int sampling_init(void)
     mE_control_word = 0;
     photometer_ch0  = 0;
     photometer_ch1  = 0;
+
+    /* 孔位状态初始化 —— 上位机通过读 0x0001 判设备就绪 */
+    {
+        uint8_t hole_init[6] = {0xFC, 0x00, 0xFF, 0x00, 0x73, 0x00};
+        reg_write_local(R_HOLE0, 3, hole_init);
+    }
+
+    /* 设备状态初始化 —— 上位机通过读 0x0012 判断仪器状态
+     * 必须在 Modbus 使能前设好默认值, 否则上位机读到全 0 会走错初始化流程
+     *
+     * 四重保险: OD变量 + regs[] + usSRegHoldBuf[] 全部设 */
+    mX_status_word = 0x1C00;  /* OD 变量 (index 0x2004) */
+    {
+        uint8_t dev_stat[4] = {0x1C, 0x00, 0x00, 0x01};  /* 0x1C00 0001 */
+        reg_write_local(R_DEV_STAT, 2, dev_stat);
+    }
+    usSRegHoldBuf[17] = 0x1C00;  /* 兜底: Modbus 本地缓存 */
+    usSRegHoldBuf[18] = 0x0001;
 
     LOG_I("Sampling init — Modbus→CAN gateway ready");
     return 0;
@@ -338,7 +401,7 @@ int sampling_init(void)
 /* mbreg <addr> <value> — 仿真上位机写 Modbus 寄存器 */
 static int mbreg(int argc, char **argv)
 {
-    if (argc < 3) {
+    if (argc < 2) {
         rt_kprintf("Usage: mbreg <addr> <value>\n");
         rt_kprintf("  Cool ON:    mbreg 14 1\n");
         rt_kprintf("  Cool OFF:   mbreg 14 0\n");
@@ -354,13 +417,13 @@ static int mbreg(int argc, char **argv)
     uint16_t addr = (uint16_t)strtoul(argv[1], NULL, 0);
 
     if (argc >= 3) {
-        /* Write */
+        /* 写入 */
         uint16_t val = (uint16_t)strtoul(argv[2], NULL, 0);
         uint8_t data[2] = { (uint8_t)(val >> 8), (uint8_t)(val & 0xFF) };
         reg_write(addr, 1, data);
         rt_kprintf("  WRITE reg[%d] = 0x%04X (%d)\n", addr, val, val);
     } else {
-        /* Read */
+        /* 读取 */
         uint8_t buf[4];
         reg_read(addr, 1, buf);
         uint16_t v = ((uint16_t)buf[0] << 8) | buf[1];

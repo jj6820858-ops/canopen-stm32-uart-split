@@ -14,12 +14,12 @@
 
 #include <rtthread.h>
 
-/* ── Module lifecycle ── */
+/* 模块生命周期 */
 int  power_on_check_init(void);
 void power_on_check_start(void);
 void power_on_check_stop(void);
 
-/* ── Status query ── */
+/* 状态查询 */
 int  power_on_check_is_running(void);
 int  power_on_check_get_phase(void);
 const char *power_on_check_get_phase_name(void);

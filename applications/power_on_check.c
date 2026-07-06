@@ -257,7 +257,7 @@ static void timer_cb(void *p)
     /* ── P2: N3 下降 两段: 快速800 + 慢速1000 ── */
     case P_2_N3_DN:
         if (g_st==0) {
-            /* Phase A: fast ramp down by 800 */
+            /* A 段: 快速下降 800 */
             g_n3_tgt = g_n3 - N3_DN_FAST_D;
             g_st = 1;
         }
@@ -266,7 +266,7 @@ static void timer_cb(void *p)
             mZ_position = g_n3;
             mZ_velocity = VELOCITY;
             if (g_n3 <= g_n3_tgt) {
-                /* Phase B: slow ramp down further */
+                /* B 段: 继续慢速下降 */
                 g_n3_tgt = g_n3 - N3_DN_SLOW_D;
                 g_st = 2;
             }
@@ -377,7 +377,7 @@ static void timer_cb(void *p)
         g_n4 = ramp(g_n4, (int32_t)E4_POS, N4_STEP);
         mE_position = g_n4;
         mE_velocity = E4_VEL;
-        /* N1/N2/N3 hold */
+        /* N1/N2/N3 保持 */
         mX_position = g_n1;
         mY_position = g_n2;
         mZ_position = g_n3;
@@ -408,7 +408,7 @@ static void timer_cb(void *p)
                                             c->sub, 4, 0, &v, 0);
                 if (ret == 0) {
                     LOG_D("SDO restore[%d] ok", idx);
-                    g_st = idx + 2;  /* advance */
+                    g_st = idx + 2;  /* 推进到下一条 */
                 } else {
                     LOG_E("SDO restore[%d] fail ret=0x%02X", idx, ret);
                 }
@@ -428,8 +428,8 @@ static void timer_cb(void *p)
     sendPDOevent(&Master_Data);
 }
 
-/* ── Public API ── */
-#define PWRCHK_VER "20260705_2325"  /* 版本: TIM3硬件t3.5定时器 */
+/* 对外接口 */
+#define PWRCHK_VER "20260706_2045"  /* 版本: 上位机孔位锁定 */
 int power_on_check_init(void) { LOG_I("ver %s", PWRCHK_VER); g_p=P_IDLE; return 0; }
 void power_on_check_start(void) {
     if (g_p!=P_IDLE&&g_p!=P_DONE) return;

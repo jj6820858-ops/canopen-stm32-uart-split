@@ -7,14 +7,15 @@
 #include "canfestival/port/timer_rtthread.h"
 #include "canfestival/od_master/ObjDict.h"
 
-/* Slave node IDs are configured in ObjDict.c (objdictgen-generated).
-   SDO channels 0x1280~0x1284 each carry their own Node_ID subindex.
-   PDO COB-IDs are hardcoded per-slave in the OD table.
-   Do NOT override at runtime — OD is the single source of truth. */
+/*
+ * 从站节点 ID 在 ObjDict.c 中配置，由 objdictgen 生成。
+ * SDO 通道 0x1280~0x1284 各自带 Node_ID 子索引。
+ * PDO COB-ID 已在对象字典表中按从站写死，运行时不要覆盖。
+ */
 
 int canopen_master_init(void);
 
-/* External: CANopen master data */
+/* CANopen 主站数据 */
 extern CO_Data Master_Data;
 
 #endif /* __CANOPEN_MASTER_H__ */

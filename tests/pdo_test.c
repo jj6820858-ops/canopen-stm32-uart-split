@@ -1,37 +1,24 @@
 /*
- * pdo_test.c — Complete PDO test commands for all axes and devices
+ * pdo_test.c - 全轴和外设 PDO 调试命令
  *
- * Covers all 14 TPDO and 10 RPDO per ObjDict.c PDO mappings.
- * Follows same pattern as motor_test.c: writeLocalDict + sendPDOevent.
+ * 覆盖 ObjDict.c 中配置的 TPDO/RPDO 映射。
+ * 调试方式和 motor_test.c 一致: writeLocalDict 后触发 sendPDOevent。
  *
- * Usage (via finsh/msh on UART1 debug console):
- *   ── Axis control (TPDO odd=modes+ctrl, TPDO even=pos+vel) ──
- *   motorX_mode/set  <mode>   — axis X modes/control
- *   motorY_*                  — axis Y (already existing)
- *   motorZ_*                  — axis Z
- *   motorE_*                  — axis E (升降臂)
- *   motorT_*                  — axis T (转盘)
- *   motor{B}_stat             — B current only (RPDO shared with E)
- *
- *   ── Sensor / peripheral PDOs ──
- *   photo_ctl  <led> [rate] [gain]  — photometer (TPDO11/14)
- *   temp_ctl   <ctrl>               — TEMP_control_word (TPDO13)
- *   temp_target <heat> <refrig>     — heating + refrigeration (TPDO12)
- *
- *   ── Status dumps (RPDO feedback) ──
- *   pdo_stat               — dump ALL RPDO feedback variables
- *   photo_stat             — dump photometer values
- *   temp_stat              — dump temperature values
- *   weight_stat            — dump weight values
+ * 用法: 在 UART1 的 finsh/msh 控制台执行:
+ *   motorY_* / motorZ_* / motorE_* / motorT_*  控制各轴对象字典变量
+ *   photo_ctl / photo_stat                     调试光度计 PDO
+ *   temp_ctl / temp_target / temp_stat         调试温控 PDO
+ *   weight_stat                                读取称重反馈
+ *   pdo_stat                                   汇总显示全部 PDO 反馈变量
  */
 
 #include <rtthread.h>
 #include <stdlib.h>
 #include "canopen_master.h"
-#include "pdo.h"                 /* sendPDOevent() */
+#include "pdo.h"                 /* 触发 PDO 发送 */
 
 /* ═══════════════════════════════════════════════════════════════════
- *  Y-axis commands (TPDO3: 0x1A02, TPDO4: 0x1A03, RPDO2: 0x1601)
+ *  Y 轴命令 (TPDO3: 0x1A02, TPDO4: 0x1A03, RPDO2: 0x1601)
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int motorY_mode(int argc, char **argv)
@@ -116,7 +103,7 @@ static int motorY_stat(int argc, char **argv)
 MSH_CMD_EXPORT(motorY_stat, read all Y motor OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  Z-axis commands (TPDO5: 0x1A04, TPDO6: 0x1A05, RPDO3: 0x1602)
+ *  Z 轴命令 (TPDO5: 0x1A04, TPDO6: 0x1A05, RPDO3: 0x1602)
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int motorZ_mode(int argc, char **argv)
@@ -199,8 +186,8 @@ static int motorZ_stat(int argc, char **argv)
 MSH_CMD_EXPORT(motorZ_stat, read all Z motor OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  E-axis commands (TPDO7: 0x1A06, TPDO8: 0x1A07, RPDO4: 0x1603)
- *  E = 升降臂 (Lift/Elevation)
+ *  E 轴命令 (TPDO7: 0x1A06, TPDO8: 0x1A07, RPDO4: 0x1603)
+ *  E = 升降臂
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int motorE_mode(int argc, char **argv)
@@ -283,8 +270,8 @@ static int motorE_stat(int argc, char **argv)
 MSH_CMD_EXPORT(motorE_stat, read all E motor (lift) OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  T-axis commands (TPDO9: 0x1A08, TPDO10: 0x1A09, RPDO5: 0x1604)
- *  T = 转盘 (Turntable)
+ *  T 轴命令 (TPDO9: 0x1A08, TPDO10: 0x1A09, RPDO5: 0x1604)
+ *  T = 转盘
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int motorT_mode(int argc, char **argv)
@@ -366,7 +353,7 @@ static int motorT_stat(int argc, char **argv)
 MSH_CMD_EXPORT(motorT_stat, read all T motor (turntable) OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  B-axis status (RPDO4 shares mB_Current_actual with E-axis)
+ *  B 轴状态 (RPDO4 与 E 轴共用 mB_Current_actual)
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int motorB_stat(int argc, char **argv)
@@ -380,7 +367,7 @@ static int motorB_stat(int argc, char **argv)
 MSH_CMD_EXPORT(motorB_stat, read B motor current (OD 0x202B, RPDO4));
 
 /* ═══════════════════════════════════════════════════════════════════
- *  Photometer commands (TPDO11: 0x1A0A, TPDO14: 0x1A0D, RPDO6: 0x1605)
+ *  光度计命令 (TPDO11: 0x1A0A, TPDO14: 0x1A0D, RPDO6: 0x1605)
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int photo_ctl(int argc, char **argv)
@@ -431,7 +418,7 @@ static int photo_stat(int argc, char **argv)
 MSH_CMD_EXPORT(photo_stat, read all photometer OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  Temperature commands (TPDO12: 0x1A0B, TPDO13: 0x1A0C, RPDO7/8: 0x1606/07)
+ *  温控命令 (TPDO12: 0x1A0B, TPDO13: 0x1A0C, RPDO7/8: 0x1606/07)
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int temp_ctl(int argc, char **argv)
@@ -489,8 +476,8 @@ static int temp_stat(int argc, char **argv)
 MSH_CMD_EXPORT(temp_stat, read all temperature OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  Weight commands (RPDO9/RPDO10: 0x1608/09)
- *  No TPDO — weights are read-only from slave
+ *  称重命令 (RPDO9/RPDO10: 0x1608/09)
+ *  没有 TPDO，重量数据只从从站读取
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int weight_stat(int argc, char **argv)
@@ -506,7 +493,7 @@ static int weight_stat(int argc, char **argv)
 MSH_CMD_EXPORT(weight_stat, read all weight OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  Master dump — ALL PDO feedback variables in one view
+ *  主站汇总: 一次性显示全部 PDO 反馈变量
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int pdo_stat(int argc, char **argv)

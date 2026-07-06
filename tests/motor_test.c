@@ -1,18 +1,18 @@
 /*
- * motor_test.c — X-axis motor debug console commands
+ * motor_test.c - X 轴电机调试命令
  *
- * Usage (via finsh/msh on UART1 debug console):
- *   motor_pos  <position>   — set mX_position (OD 0x2002), triggers TPDO2
- *   motor_vel  <velocity>   — set mX_velocity (OD 0x2003), triggers TPDO2
- *   motor_mode <mode>       — set mX_modes    (OD 0x2001)
- *   motor_ctrl <ctrl_word>  — set mX_control_word (OD 0x2005)
- *   motor_stat              — read all X-axis OD variables
+ * 用法: 在 UART1 的 finsh/msh 控制台执行:
+ *   motor_pos  <position>   设置 mX_position，并触发 TPDO2
+ *   motor_vel  <velocity>   设置 mX_velocity，并触发 TPDO2
+ *   motor_mode <mode>       设置 mX_modes
+ *   motor_ctrl <ctrl_word>  设置 mX_control_word
+ *   motor_stat              读取 X 轴对象字典变量
  */
 
 #include <rtthread.h>
 #include <stdlib.h>
 #include "canopen_master.h"
-#include "pdo.h"                 /* sendPDOevent() */
+#include "pdo.h"                 /* 触发 PDO 发送 */
 
 static int motor_pos(int argc, char **argv)
 {

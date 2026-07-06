@@ -27,7 +27,7 @@ int  sampling_init(void);
  * reg_router 在 reg_write() 完成后调用此函数,
  * MCU 据此触发对应的 CANopen 动作。
  *
- * 上位机 write → reg_router.reg_write() → 更新 regs[] → sampling_on_reg_write()
+ * 上位机写入 -> reg_router.reg_write() -> 更新 regs[] -> sampling_on_reg_write()
  *                                                                    │
  *                                                     ┌──────────────┘
  *                                                     ▼
