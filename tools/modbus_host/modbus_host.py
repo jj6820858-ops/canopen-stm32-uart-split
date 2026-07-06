@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from datetime import datetime
 import queue
+import re
 import threading
 import time
 import tkinter as tk
@@ -20,6 +21,20 @@ from modbus_codec import append_crc, decode_frame, parse_hex_string
 
 DEFAULT_BAUDRATE = 115200
 DEFAULT_FRAME_GAP_MS = 20
+
+
+def port_sort_key(device: str) -> tuple[int, int | str]:
+    match = re.fullmatch(r"COM(\d+)", device.upper())
+    if match:
+        return (0, int(match.group(1)))
+    return (1, device)
+
+
+def port_display_name(device: str, description: str = "") -> str:
+    description = description.strip()
+    if description and description != device:
+        return f"{device} - {description}"
+    return device
 
 
 class SerialReader(threading.Thread):
@@ -108,6 +123,7 @@ class ModbusHostApp:
         self.events: queue.Queue = queue.Queue()
         self.reader: SerialReader | None = None
         self.rows: list[dict[str, str]] = []
+        self.port_display_to_device: dict[str, str] = {}
 
         self.port_var = tk.StringVar()
         self.baud_var = tk.StringVar(value=str(DEFAULT_BAUDRATE))
@@ -130,7 +146,7 @@ class ModbusHostApp:
         toolbar.columnconfigure(1, weight=1)
 
         ttk.Label(toolbar, text="串口").grid(row=0, column=0, sticky="w")
-        self.port_combo = ttk.Combobox(toolbar, textvariable=self.port_var, width=18, state="readonly")
+        self.port_combo = ttk.Combobox(toolbar, textvariable=self.port_var, width=42, state="readonly")
         self.port_combo.grid(row=0, column=1, sticky="w", padx=(6, 12))
 
         ttk.Button(toolbar, text="刷新", command=self.refresh_ports).grid(row=0, column=2, padx=(0, 12))
@@ -219,14 +235,26 @@ class ModbusHostApp:
         ttk.Label(send_bar, textvariable=self.status_var).grid(row=0, column=4, sticky="e")
 
     def refresh_ports(self) -> None:
+        selected = self.port_var.get().strip()
+        selected_device = self.port_display_to_device.get(selected, selected.split(" - ", 1)[0])
+
         ports = []
+        self.port_display_to_device = {}
         if list_ports is not None:
-            ports = [item.device for item in list_ports.comports()]
+            for item in sorted(list_ports.comports(), key=lambda port: port_sort_key(port.device)):
+                label = port_display_name(item.device, item.description)
+                ports.append(label)
+                self.port_display_to_device[label] = item.device
         if not ports:
             ports = [f"COM{i}" for i in range(1, 33)]
+            self.port_display_to_device = {port: port for port in ports}
         self.port_combo["values"] = ports
         if not self.port_var.get() or self.port_var.get() not in ports:
-            self.port_var.set(ports[0])
+            matched = next(
+                (label for label, device in self.port_display_to_device.items() if device == selected_device),
+                ports[0],
+            )
+            self.port_var.set(matched)
 
     def toggle_connection(self) -> None:
         if self.reader is not None:
@@ -239,7 +267,8 @@ class ModbusHostApp:
             messagebox.showerror("缺少依赖", "未安装 pyserial，请先运行: python -m pip install pyserial")
             return
 
-        port = self.port_var.get().strip()
+        selected = self.port_var.get().strip()
+        port = self.port_display_to_device.get(selected, selected.split(" - ", 1)[0])
         if not port:
             messagebox.showwarning("请选择串口", "先选择一个 COM 口")
             return
