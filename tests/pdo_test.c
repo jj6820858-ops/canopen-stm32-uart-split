@@ -14,8 +14,8 @@
 
 #include <rtthread.h>
 #include <stdlib.h>
-#include "canopen_master.h"
-#include "pdo.h"                 /* 触发 PDO 发送 */
+#include "../applications/canopen/canopen_master.h"
+#include "../canfestival/include/pdo.h"     /* 触发 PDO 发送 */
 
 /* ═══════════════════════════════════════════════════════════════════
  *  Y 轴命令 (TPDO3: 0x1A02, TPDO4: 0x1A03, RPDO2: 0x1601)

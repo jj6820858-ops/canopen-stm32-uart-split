@@ -6,8 +6,8 @@
 #include <rtthread.h>
 #include <stdlib.h>
 
-#include "app_thread.h"
-#include "can_driver.h"
+#include "../applications/threads/app_thread.h"
+#include "../canfestival/include/can_driver.h"
 
 static volatile int g_test_running = 0;
 

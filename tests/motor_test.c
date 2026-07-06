@@ -11,8 +11,8 @@
 
 #include <rtthread.h>
 #include <stdlib.h>
-#include "canopen_master.h"
-#include "pdo.h"                 /* 触发 PDO 发送 */
+#include "../applications/canopen/canopen_master.h"
+#include "../canfestival/include/pdo.h"     /* 触发 PDO 发送 */
 
 static int motor_pos(int argc, char **argv)
 {
