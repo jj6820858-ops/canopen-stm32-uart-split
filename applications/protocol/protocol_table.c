@@ -7,7 +7,7 @@
 #include "protocol_table.h"
 
 #include <stddef.h>
-#include "canopen_master.h"
+#include "../canopen/canopen_master.h"
 
 #define ARRAY_SIZE(array) ((uint16_t)(sizeof(array) / sizeof((array)[0])))
 

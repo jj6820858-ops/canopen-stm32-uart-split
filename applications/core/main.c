@@ -3,7 +3,7 @@
  *
  * 具体模块初始化和运行线程统一放在 app_thread.c 中管理。
  */
-#include "app_thread.h"
+#include "../threads/app_thread.h"
 
 int main(void)
 {

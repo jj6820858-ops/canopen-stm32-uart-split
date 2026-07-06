@@ -17,7 +17,7 @@
  *   t=23.0s:    DONE
  */
 #include "power_on_check.h"
-#include "canopen_master.h"
+#include "../canopen/canopen_master.h"
 #include <rtthread.h>
 #include <string.h>
 #include "sdo.h"

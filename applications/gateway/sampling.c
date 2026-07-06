@@ -19,8 +19,8 @@
  * ── 关键: MCU 不主动驱动流程, 只在收到 Modbus 写时执行对应 CAN 动作 ──
  */
 #include "sampling.h"
-#include "reg_router.h"
-#include "canopen_master.h"
+#include "../protocol/reg_router.h"
+#include "../canopen/canopen_master.h"
 #include "pdo.h"              /* 触发 PDO 发送 */
 #include <rtthread.h>
 #include <string.h>

@@ -13,9 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "canopen_master.h"
+#include "../canopen/canopen_master.h"
 #include "protocol_table.h"
-#include "sampling.h"
+#include "../gateway/sampling.h"
 
 #define DBG_TAG "router"
 #define DBG_LVL DBG_INFO

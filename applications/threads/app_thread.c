@@ -11,13 +11,13 @@
 #include <board.h>
 #include <rtthread.h>
 
-#include "canopen_master.h"
+#include "../canopen/canopen_master.h"
 #include "can_driver.h"
 #include "mb.h"
 #include "pdo.h"
-#include "power_on_check.h"
-#include "reg_router.h"
-#include "sampling.h"
+#include "../workflow/power_on_check.h"
+#include "../protocol/reg_router.h"
+#include "../gateway/sampling.h"
 #include "states.h"
 #include "user_mb_app.h"
 

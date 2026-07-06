@@ -1,6 +1,6 @@
 #include "canopen_master.h"
-#include "reg_router.h"
-#include "sampling.h"
+#include "../protocol/reg_router.h"
+#include "../gateway/sampling.h"
 
 #define DBG_TAG "canopen"
 #define DBG_LVL DBG_LOG
