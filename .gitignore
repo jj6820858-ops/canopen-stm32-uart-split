@@ -1,6 +1,8 @@
 # Build output
 Debug/
 build/
+__pycache__/
+*.pyc
 *.o
 *.d
 *.elf
