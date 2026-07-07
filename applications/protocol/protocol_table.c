@@ -14,6 +14,7 @@
 static const od_sync_t g_od_sync_table[] = {
     /* X轴: 针头旋转，对应 TPDO1/TPDO2 */
     {  3, &mX_modes,          1, 1 },  /* 00004  清洗针头 */
+
     /* mX_position/mX_velocity 对应 0x301，但当前 Modbus 主流程未绑定位置/速度寄存器。 */
 
     /* E轴: 柱塞泵，对应 TPDO7/TPDO8 */
@@ -24,9 +25,9 @@ static const od_sync_t g_od_sync_table[] = {
     { 10, &mY_modes,          1, 1 },  /* 00011  转盘功能使能 */
     /* 00012~00014 为 48 位孔位位图，由 sampling.c 转成 mY_position。 */
 
-    /* 光强反馈 */
-    { 15, &photometer_ch0,    1, 2 },  /* 00016  光强通道0 */
-    { 16, &photometer_ch1,    1, 2 },  /* 00017  光强通道1 */
+    /* 光强反馈: 00016~00017 是同一次读光强的 32-bit 结果，不是检测通道数量。 */
+    { 15, &photometer_ch0,    1, 2 },  /* 00016  光强低字 */
+    { 16, &photometer_ch1,    1, 2 },  /* 00017  光强高字 */
 
     /* 实时数据反馈 */
     { 99, &current_heating,      1, 4 }, /* 00100  转盘加热温度 */
