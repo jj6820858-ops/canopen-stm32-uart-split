@@ -14,6 +14,7 @@
 static const od_sync_t g_od_sync_table[] = {
     /* X轴: 针头旋转，对应 TPDO1/TPDO2 */
     {  3, &mX_modes,          1, 1 },  /* 00004  清洗针头 */
+    /* mX_position/mX_velocity 对应 0x301，但当前 Modbus 主流程未绑定位置/速度寄存器。 */
 
     /* E轴: 柱塞泵，对应 TPDO7/TPDO8 */
     {  4, &mE_control_word,   1, 2 },  /* 00005  取液/注液/清洗 */

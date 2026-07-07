@@ -10,6 +10,7 @@
  *   06 写 0x000B = 0xC000 (回零)   →  mY_position=-19, Y 转盘回零
  *   06 写 0x0005 = 0x2000 (启泵)   →  mE_control_word=0x9000, 启动 E 柱塞泵
  *   06 写 0x0005 = 0x0000 (停泵)   →  mE_control_word=0, 停止 E 柱塞泵
+ *   06 写 0x0003 = 0~5    (洗针)   →  mX_modes, X 针头旋转/洗针模式
  *   06 写 0x0004 = 0x8000 (触发)   →  执行动作命令
  *   06 写 0x0004 = 0x1000 (就绪)   →  设就绪状态
  *   03 读 0x0000(3)    (孔位)     →  返回 Node6 编码器位置
@@ -26,6 +27,9 @@
 #include <string.h>
 
 /* OD 变量 (ObjDict.h) */
+extern INTEGER8  mX_modes;            /* Node1 X 轴: 针头旋转 */
+extern INTEGER32 mX_position;
+extern INTEGER32 mX_velocity;
 extern UNS16    mX_control_word;
 extern UNS16    mX_status_word;
 extern INTEGER8  mY_modes;            /* Node2 Y 轴: 转盘 */
@@ -322,9 +326,8 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
 
     /* ── 0x0003: 针头清洗/动作触发 ── */
     case R_NEEDLE:
-        if (value == 0x8000) {
-            LOG_I("Needle: EXECUTE");
-        }
+        mX_modes = (INTEGER8)(value & 0xFF);
+        LOG_I("Needle/X: mode=%d", (int)mX_modes);
         break;
 
     /* ── 0x0004: 动作命令 ── */
@@ -452,6 +455,7 @@ int sampling_init(void)
     mY_position     = SLOT_IDLE_POS;
     mY_control_word = 0;
     mY_modes        = 0;
+    mX_modes        = 0;
     mX_control_word = 0;
     mZ_control_word = 0;
     mE_control_word = 0;
