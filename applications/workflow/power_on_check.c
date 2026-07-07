@@ -2,6 +2,7 @@
  * power_on_check.c — 上电校验 (匹配 上电校验4.csv)
  *
  * 成品精确时序 (10ms/tick):
+ *   轴映射: N1=0x301=X针头旋转, N2=0x302=Y转盘, N3=0x303=Z上下, N4=0x304=E柱塞泵
  *   t=0ms:      NMT → Node 1,4,7
  *   t=10ms:     SDO 链 (7个, ~0.35s完成)
  *   t=10ms:     N3 0→780          @20/tick (0.36s)
@@ -11,7 +12,7 @@
  *   t=3.7s:     N1 reverse +15    @15/tick (过0), N2 reverse +10 @10/tick
  *   t=5.5s:     N1 reverse -15    @15/tick, N2 micro -1  @1/tick
  *   t=6.0s:     N1 micro +1       @1/tick
- *   t=7.3s:     N4 → -32003       @30/tick
+ *   t=7.3s:     N4/E柱塞泵 → -32003 @30/tick
  *   t=11.0s:    STOP → 全零
  *   t=20.0s:    SDO restore N1=300
  *   t=23.0s:    DONE
@@ -29,7 +30,7 @@ extern INTEGER32 mX_position, mY_position, mZ_position, mE_position;
 extern INTEGER32 mX_velocity, mY_velocity, mZ_velocity, mE_velocity;
 extern UNS16 photometer_ch0, photometer_ch1;
 extern UNS32 heating_target, refrigeration_target;
-extern INTEGER8 mT_modes;  /* 转盘功能使能 */
+extern INTEGER8 mT_modes;  /* 历史/温控辅助对象；主转盘轴为 mY */
 extern UNS32 TEMP_control_word;  /* 温控控制字 */
 
 #define DBG_TAG "pwrchk"
@@ -53,8 +54,8 @@ extern UNS32 TEMP_control_word;  /* 温控控制字 */
 #define N2_GO_D        1360         /* N2 GO 偏移 */
 #define N2_BACK_D      1370         /* N2 BACK 反弹量 (-1360→10) */
 #define N2_RET_D       11           /* N2 RETURN 回退量 (10→-1) */
-#define N4_STEP        100          /* N4 step/tick */
-#define E4_POS         ((INTEGER32)0xFFFF82FD)  /* Node4 -32003 */
+#define N4_STEP        100          /* N4/E 柱塞泵 step/tick */
+#define E4_POS         ((INTEGER32)0xFFFF82FD)  /* Node4/E 柱塞泵 -32003 */
 #define E4_VEL         0x00019000
 
 /* ── 时间触发 (ms) ── */
@@ -183,24 +184,24 @@ static void send_temp_pdo(void)
     canSend(Master_Data.canHandle, &m);
 }
 
-/* 直接发转盘加热使能到 0x203 和 0x205 */
+/* 按上电抓包直接发加热辅助使能到 0x203 和 0x205；不作为主转盘轴映射。 */
 static void send_heat_enable(void)
 {
     Message m;
     memset(&m, 0, sizeof(m));
     m.rtr = 0;
 
-    /* TPDO5 → COB 0x203 (Node3): mT_status_word(2B) + mT_modes(1B) */
+    /* TPDO5 → COB 0x203 (历史辅助帧): status(2B) + mT_modes(1B) */
     m.cob_id = 0x203;
     m.len = 3;
     m.data[0] = 0; m.data[1] = 0;  /* mT_status_word = 0 */
-    m.data[2] = (UNS8)mT_modes;     /* mT_modes */
+    m.data[2] = (UNS8)mT_modes;     /* 历史辅助 mode */
     canSend(Master_Data.canHandle, &m);
 
-    /* TPDO9 → COB 0x205 (Node5): mT_modes(1B) + mT_control_word(2B) */
+    /* TPDO9 → COB 0x205 (Node5 辅助对象): mT_modes(1B) + control_word(2B) */
     m.cob_id = 0x205;
     m.len = 3;
-    m.data[0] = (UNS8)mT_modes;     /* mT_modes */
+    m.data[0] = (UNS8)mT_modes;     /* 历史辅助 mode */
     m.data[1] = 0; m.data[2] = 0;   /* mT_control_word = 0 */
     canSend(Master_Data.canHandle, &m);
 }
@@ -241,7 +242,7 @@ static void timer_cb(void *p)
             TEMP_control_word = 0x0003;     /* bit0=加热ON, bit1=制冷ON */
             heating_target = 0x09C4;       /* 25.00°C (2500) */
             refrigeration_target = 0x03E8;  /* 10.00°C (1000) */
-            mT_modes = 0x01;                /* 转盘加热使能 */
+            mT_modes = 0x01;                /* 温控加热辅助使能 */
             send_temp_pdo();                /* → 0x207 + 0x307 */
             send_heat_enable();             /* → 0x203 + 0x205 */
             LOG_I("Heat=25C Cool=10C");
@@ -368,7 +369,7 @@ static void timer_cb(void *p)
         if (g_n12_sub == N12_MICRO && m >= 1000) enter(P_5_N4);
         break;
 
-    /* ── P5: N4 下降 ── */
+    /* ── P5: N4/E 柱塞泵行程 ── */
     case P_5_N4:
         if (g_st==0) {
             LOG_I("N4: %ld→%ld", (long)g_n4, (long)E4_POS);

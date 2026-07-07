@@ -5,7 +5,7 @@
  * 调试方式和 motor_test.c 一致: writeLocalDict 后触发 sendPDOevent。
  *
  * 用法: 在 UART1 的 finsh/msh 控制台执行:
- *   motorY_* / motorZ_* / motorE_* / motorT_*  控制各轴对象字典变量
+ *   motorY_* / motorZ_* / motorE_* / motorT_*  控制各轴/辅助对象字典变量
  *   photo_ctl / photo_stat                     调试光度计 PDO
  *   temp_ctl / temp_target / temp_stat         调试温控 PDO
  *   weight_stat                                读取称重反馈
@@ -18,7 +18,7 @@
 #include "../canfestival/include/pdo.h"     /* 触发 PDO 发送 */
 
 /* ═══════════════════════════════════════════════════════════════════
- *  Y 轴命令 (TPDO3: 0x1A02, TPDO4: 0x1A03, RPDO2: 0x1601)
+ *  Y 轴命令: 转盘 (TPDO3: 0x1A02, TPDO4: 0x1A03, RPDO2: 0x1601)
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int motorY_mode(int argc, char **argv)
@@ -36,7 +36,7 @@ static int motorY_mode(int argc, char **argv)
     rt_kprintf("  mY_modes (0x2006) = %d  → TPDO3\n", (int)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorY_mode, set Y motor op mode (OD 0x2006 → TPDO3));
+MSH_CMD_EXPORT(motorY_mode, set Y turntable op mode (OD 0x2006 → TPDO3));
 
 static int motorY_ctrl(int argc, char **argv)
 {
@@ -53,7 +53,7 @@ static int motorY_ctrl(int argc, char **argv)
     rt_kprintf("  mY_control_word (0x200A) = 0x%04X  → TPDO3\n", (unsigned)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorY_ctrl, set Y motor control word (OD 0x200A → TPDO3));
+MSH_CMD_EXPORT(motorY_ctrl, set Y turntable control word (OD 0x200A → TPDO3));
 
 static int motorY_pos(int argc, char **argv)
 {
@@ -69,7 +69,7 @@ static int motorY_pos(int argc, char **argv)
     rt_kprintf("  mY_position (0x2007) = %ld  → TPDO4\n", (long)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorY_pos, set Y motor target position (OD 0x2007 → TPDO4));
+MSH_CMD_EXPORT(motorY_pos, set Y turntable target position (OD 0x2007 → TPDO4));
 
 static int motorY_vel(int argc, char **argv)
 {
@@ -85,12 +85,12 @@ static int motorY_vel(int argc, char **argv)
     rt_kprintf("  mY_velocity (0x2008) = %ld  → TPDO4\n", (long)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorY_vel, set Y motor velocity (OD 0x2008 → TPDO4));
+MSH_CMD_EXPORT(motorY_vel, set Y turntable velocity (OD 0x2008 → TPDO4));
 
 static int motorY_stat(int argc, char **argv)
 {
     (void)argc; (void)argv;
-    rt_kprintf("---- Y-axis Motor Status (TPDO3/TPDO4, RPDO2) ----\n");
+    rt_kprintf("---- Y-axis Turntable Status (TPDO3/TPDO4, RPDO2) ----\n");
     rt_kprintf("  mY_modes        (0x2006) = %d\n", (int)mY_modes);
     rt_kprintf("  mY_position     (0x2007) = %ld\n", (long)mY_position);
     rt_kprintf("  mY_velocity     (0x2008) = %ld\n", (long)mY_velocity);
@@ -100,7 +100,7 @@ static int motorY_stat(int argc, char **argv)
     rt_kprintf("----------------------------------------------------\n");
     return 0;
 }
-MSH_CMD_EXPORT(motorY_stat, read all Y motor OD variables);
+MSH_CMD_EXPORT(motorY_stat, read all Y turntable OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
  *  Z 轴命令 (TPDO5: 0x1A04, TPDO6: 0x1A05, RPDO3: 0x1602)
@@ -186,8 +186,8 @@ static int motorZ_stat(int argc, char **argv)
 MSH_CMD_EXPORT(motorZ_stat, read all Z motor OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  E 轴命令 (TPDO7: 0x1A06, TPDO8: 0x1A07, RPDO4: 0x1603)
- *  E = 升降臂
+ *  E 轴命令: 柱塞泵 (TPDO7: 0x1A06, TPDO8: 0x1A07, RPDO4: 0x1603)
+ *  E = 柱塞泵
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int motorE_mode(int argc, char **argv)
@@ -204,7 +204,7 @@ static int motorE_mode(int argc, char **argv)
     rt_kprintf("  mE_modes (0x2010) = %d  → TPDO7\n", (int)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorE_mode, set E motor (lift) op mode (OD 0x2010 → TPDO7));
+MSH_CMD_EXPORT(motorE_mode, set E plunger pump op mode (OD 0x2010 → TPDO7));
 
 static int motorE_ctrl(int argc, char **argv)
 {
@@ -220,7 +220,7 @@ static int motorE_ctrl(int argc, char **argv)
     rt_kprintf("  mE_control_word (0x2014) = 0x%04X  → TPDO7\n", (unsigned)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorE_ctrl, set E motor (lift) control word (OD 0x2014 → TPDO7));
+MSH_CMD_EXPORT(motorE_ctrl, set E plunger pump control word (OD 0x2014 → TPDO7));
 
 static int motorE_pos(int argc, char **argv)
 {
@@ -236,7 +236,7 @@ static int motorE_pos(int argc, char **argv)
     rt_kprintf("  mE_position (0x2011) = %ld  → TPDO8\n", (long)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorE_pos, set E motor (lift) position (OD 0x2011 → TPDO8));
+MSH_CMD_EXPORT(motorE_pos, set E plunger pump position (OD 0x2011 → TPDO8));
 
 static int motorE_vel(int argc, char **argv)
 {
@@ -252,12 +252,12 @@ static int motorE_vel(int argc, char **argv)
     rt_kprintf("  mE_velocity (0x2012) = %ld  → TPDO8\n", (long)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorE_vel, set E motor (lift) velocity (OD 0x2012 → TPDO8));
+MSH_CMD_EXPORT(motorE_vel, set E plunger pump velocity (OD 0x2012 → TPDO8));
 
 static int motorE_stat(int argc, char **argv)
 {
     (void)argc; (void)argv;
-    rt_kprintf("---- E-axis (Lift) Motor Status (TPDO7/TPDO8, RPDO4) ----\n");
+    rt_kprintf("---- E-axis Plunger Pump Status (TPDO7/TPDO8, RPDO4) ----\n");
     rt_kprintf("  mE_modes        (0x2010) = %d\n", (int)mE_modes);
     rt_kprintf("  mE_position     (0x2011) = %ld\n", (long)mE_position);
     rt_kprintf("  mE_velocity     (0x2012) = %ld\n", (long)mE_velocity);
@@ -267,11 +267,11 @@ static int motorE_stat(int argc, char **argv)
     rt_kprintf("----------------------------------------------------------\n");
     return 0;
 }
-MSH_CMD_EXPORT(motorE_stat, read all E motor (lift) OD variables);
+MSH_CMD_EXPORT(motorE_stat, read all E plunger pump OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
- *  T 轴命令 (TPDO9: 0x1A08, TPDO10: 0x1A09, RPDO5: 0x1604)
- *  T = 转盘
+ *  T 辅助对象命令 (TPDO9: 0x1A08, TPDO10: 0x1A09, RPDO5: 0x1604)
+ *  主转盘轴为 Y；T 保留为历史/辅助对象。
  * ═══════════════════════════════════════════════════════════════════ */
 
 static int motorT_mode(int argc, char **argv)
@@ -288,7 +288,7 @@ static int motorT_mode(int argc, char **argv)
     rt_kprintf("  mT_modes (0x2015) = %d  → TPDO9\n", (int)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorT_mode, set T motor (turntable) op mode (OD 0x2015 → TPDO9));
+MSH_CMD_EXPORT(motorT_mode, set T auxiliary op mode (OD 0x2015 → TPDO9));
 
 static int motorT_ctrl(int argc, char **argv)
 {
@@ -304,7 +304,7 @@ static int motorT_ctrl(int argc, char **argv)
     rt_kprintf("  mT_control_word (0x2019) = 0x%04X  → TPDO9\n", (unsigned)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorT_ctrl, set T motor (turntable) control word (OD 0x2019 → TPDO9));
+MSH_CMD_EXPORT(motorT_ctrl, set T auxiliary control word (OD 0x2019 → TPDO9));
 
 static int motorT_pos(int argc, char **argv)
 {
@@ -320,7 +320,7 @@ static int motorT_pos(int argc, char **argv)
     rt_kprintf("  mT_position (0x2016) = %ld  → TPDO10\n", (long)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorT_pos, set T motor (turntable) position (OD 0x2016 → TPDO10));
+MSH_CMD_EXPORT(motorT_pos, set T auxiliary position (OD 0x2016 → TPDO10));
 
 static int motorT_vel(int argc, char **argv)
 {
@@ -336,12 +336,12 @@ static int motorT_vel(int argc, char **argv)
     rt_kprintf("  mT_velocity (0x2017) = %ld  → TPDO10\n", (long)val);
     return 0;
 }
-MSH_CMD_EXPORT(motorT_vel, set T motor (turntable) velocity (OD 0x2017 → TPDO10));
+MSH_CMD_EXPORT(motorT_vel, set T auxiliary velocity (OD 0x2017 → TPDO10));
 
 static int motorT_stat(int argc, char **argv)
 {
     (void)argc; (void)argv;
-    rt_kprintf("---- T-axis (Turntable) Status (TPDO9/TPDO10, RPDO5) ----\n");
+    rt_kprintf("---- T Auxiliary Status (TPDO9/TPDO10, RPDO5) ----\n");
     rt_kprintf("  mT_modes        (0x2015) = %d\n", (int)mT_modes);
     rt_kprintf("  mT_position     (0x2016) = %ld\n", (long)mT_position);
     rt_kprintf("  mT_velocity     (0x2017) = %ld\n", (long)mT_velocity);
@@ -350,7 +350,7 @@ static int motorT_stat(int argc, char **argv)
     rt_kprintf("---------------------------------------------------------\n");
     return 0;
 }
-MSH_CMD_EXPORT(motorT_stat, read all T motor (turntable) OD variables);
+MSH_CMD_EXPORT(motorT_stat, read all T auxiliary OD variables);
 
 /* ═══════════════════════════════════════════════════════════════════
  *  B 轴状态 (RPDO4 与 E 轴共用 mB_Current_actual)

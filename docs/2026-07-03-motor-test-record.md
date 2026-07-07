@@ -85,6 +85,15 @@ sendPDOevent() 检测到 OD 变量变化 ─→ 构建 TPDO ─→ CAN 总线 �
 | TPDO13 | 0x307 | 0xFF | 1s | TEMP_control_word |
 | TPDO14 | 0x306 | 0xFF | 3s | photometer_rate + photometer_gain |
 
+### 轴与机构对应
+
+| 实际轴 | 机构 | 位置 PDO | OD 变量 |
+|--------|------|----------|---------|
+| X | 针头旋转 | 0x301 | mX_position + mX_velocity |
+| Y | 转盘 | 0x302 | mY_position + mY_velocity |
+| Z | 上下 | 0x303 | mZ_position + mZ_velocity |
+| E | 柱塞泵 | 0x304 | mE_position + mE_velocity |
+
 ### RPDO（从站 → 主站）
 
 | RPDO | COB-ID | 映射内容 |
@@ -120,13 +129,13 @@ sendPDOevent() 检测到 OD 变量变化 ─→ 构建 TPDO ─→ CAN 总线 �
 |------|-----|------|------|------|
 | 00001~00003 | - | local | R | 孔位状态 (48-bit bitmap) |
 | 00004 | 0x2001 | mX_modes | RW | 清洗针头 → X 轴模式 |
-| 00005 | 0x2005 | mX_control_word | RW | 取液/注液/清洗 → X 轴控制字 |
-| 00006~00007 | 0x2002 | mX_position | RW | 柱塞泵液量 → X 轴位置 (32-bit) |
-| 00008 | 0x2003 | mX_velocity | RW | 蠕动泵转速 → X 轴速度 (32-bit) |
+| 00005 | 0x2014 | mE_control_word | RW | 取液/注液/清洗 → E 柱塞泵控制字 |
+| 00006~00007 | 0x2011 | mE_position | RW | 柱塞泵液量 → E 轴位置 (32-bit) |
+| 00008 | - | local | RW | 蠕动泵转速 |
 | 00009 | - | local | RW | 蠕动泵圈数 |
 | 00010 | - | local | RW | 操作位号 (bitmap) |
-| 00011 | 0x2015 | mT_modes | RW | 转盘功能使能 |
-| 00012~00014 | 0x2016 | mT_position | RW | 转盘指定位号 (48-bit → 32-bit lo) |
+| 00011 | 0x2006 | mY_modes | RW | 转盘功能使能 |
+| 00012~00014 | - | local → mY_position | RW | 转盘指定位号 (48-bit 位图，由 sampling.c 转换) |
 | 00015 | 0x201F | refrigeration_target | RW | 酶孔位制冷 |
 | 00016~00017 | 0x201A/B | photometer_ch0/1 | R | 光强读数 |
 | 00018~00019 | - | local | R | 仪器状态 (32-bit bitmap) |
@@ -259,9 +268,9 @@ reg list              # 列出全部寄存器
 | Modbus | OD | 变量 | 说明 |
 |--------|-----|------|------|
 | 00004 | 0x2001 | mX_modes | 运行模式 |
-| 00005 | 0x2005 | mX_control_word | 控制字 |
-| 00006~00007 | 0x2002 | mX_position | 目标位置 (32-bit) |
-| 00008 | 0x2003 | mX_velocity | 速度 (32-bit, lo 16) |
+| 00005 | 0x2014 | mE_control_word | E 柱塞泵控制字 |
+| 00006~00007 | 0x2011 | mE_position | E 柱塞泵目标位置 (32-bit) |
+| 00008 | - | local | 蠕动泵速度 (协议寄存器，本地保存) |
 
 ## 9. 已知问题
 

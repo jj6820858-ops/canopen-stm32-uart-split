@@ -12,18 +12,16 @@
 #define ARRAY_SIZE(array) ((uint16_t)(sizeof(array) / sizeof((array)[0])))
 
 static const od_sync_t g_od_sync_table[] = {
-    /* X轴: 针/泵操作，对应 TPDO1/TPDO2 */
+    /* X轴: 针头旋转，对应 TPDO1/TPDO2 */
     {  3, &mX_modes,          1, 1 },  /* 00004  清洗针头 */
-    {  4, &mX_control_word,   1, 2 },  /* 00005  取液/注液/清洗 */
-    {  5, &mX_position,       2, 4 },  /* 00006~00007  柱塞泵液量 */
-    {  7, &mX_velocity,       1, 4 },  /* 00008  蠕动泵转速 */
 
-    /* Y轴: 蠕动泵 */
-    {  8, &mY_position,       1, 4 },  /* 00009  蠕动泵圈数 */
+    /* E轴: 柱塞泵，对应 TPDO7/TPDO8 */
+    {  4, &mE_control_word,   1, 2 },  /* 00005  取液/注液/清洗 */
+    {  5, &mE_position,       2, 4 },  /* 00006~00007  柱塞泵液量 */
 
-    /* T轴: 转盘 */
-    { 10, &mT_modes,          1, 1 },  /* 00011  转盘功能使能 */
-    /* 00012~00014 为 48 位孔位位图，由 sampling.c 单独处理。 */
+    /* Y轴: 转盘，对应 TPDO3/TPDO4 */
+    { 10, &mY_modes,          1, 1 },  /* 00011  转盘功能使能 */
+    /* 00012~00014 为 48 位孔位位图，由 sampling.c 转成 mY_position。 */
 
     /* 光强反馈 */
     { 15, &photometer_ch0,    1, 2 },  /* 00016  光强通道0 */

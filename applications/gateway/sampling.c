@@ -5,11 +5,11 @@
  *
  *   上位机                              MCU
  *   ─────────────────────────────────────────────
- *   06 写 0x000B = 0x8000 (停止)   →  mT_position=0, 停止 RPDO2
- *   06 写 0x000B = 0x9000 (启动)   →  mT_position=目标位, 启动 RPDO2
- *   06 写 0x000B = 0xC000 (回零)   →  mT_position=-19, 回零
- *   06 写 0x0005 = 0x2000 (启泵)   →  mX_control_word=1, 启动泵
- *   06 写 0x0005 = 0x0000 (停泵)   →  mX_control_word=0, 停止泵
+ *   06 写 0x000B = 0x8000 (停止)   →  mY_position=0, 停止 Y 转盘
+ *   06 写 0x000B = 0x9000 (启动)   →  mY_position=目标位, 启动 Y 转盘
+ *   06 写 0x000B = 0xC000 (回零)   →  mY_position=-19, Y 转盘回零
+ *   06 写 0x0005 = 0x2000 (启泵)   →  mE_control_word=0x9000, 启动 E 柱塞泵
+ *   06 写 0x0005 = 0x0000 (停泵)   →  mE_control_word=0, 停止 E 柱塞泵
  *   06 写 0x0004 = 0x8000 (触发)   →  执行动作命令
  *   06 写 0x0004 = 0x1000 (就绪)   →  设就绪状态
  *   03 读 0x0000(3)    (孔位)     →  返回 Node6 编码器位置
@@ -26,20 +26,14 @@
 #include <string.h>
 
 /* OD 变量 (ObjDict.h) */
-extern INTEGER32 mT_position;         /* Node3 转盘位置 */
-extern UNS16    mT_control_word;
-extern UNS16    mT_status_word;
-extern INTEGER8  mT_modes;
-extern INTEGER32 mX_position;         /* Node1 电机A */
 extern UNS16    mX_control_word;
 extern UNS16    mX_status_word;
-extern INTEGER32 mY_position;         /* Node2 */
+extern INTEGER8  mY_modes;            /* Node2 Y 轴: 转盘 */
+extern INTEGER32 mY_position;
 extern UNS16    mY_control_word;
-extern INTEGER32 mZ_position;         /* Node3 */
+extern INTEGER32 mZ_position;         /* Node3 Z 轴: 上下 */
 extern UNS16    mZ_control_word;
-extern INTEGER32 mE_position;         /* Node4 升降轴 */
-extern UNS16    mE_control_word;
-extern UNS16    mE_status_word;
+extern UNS16    mE_control_word;      /* Node4 E 轴: 柱塞泵 */
 extern UNS16    photometer_ch0;       /* RPDO1 Node6 */
 extern UNS16    photometer_ch1;
 extern UNS32    current_heating;      /* Node8 ch1 → Modbus 0x0063 */
@@ -164,7 +158,7 @@ static void turntable_apply_function(uint16_t value)
 {
     uint8_t mode = (uint8_t)(value >> 8);
 
-    mT_modes = (INTEGER8)mode;
+    mY_modes = (INTEGER8)mode;
 
     if (mode & 0x80) {
         TEMP_control_word |= 0x0001;       /* 加热使能 */
@@ -195,13 +189,13 @@ void sampling_sync_can_to_modbus(void)
     /*
      * CAN TPDO1 Node6 (0x186) → 编码器位置 → 孔位编码
      *
-     * 这里用 mT_position 的低 16 位模拟编码器值。
+     * 这里用 mY_position 的低 16 位模拟编码器值。
      * 实际硬件连接后, CAN 中断会更新独立的编码器 OD 变量,
      * 届时替换为真实的编码器变量。
      *
      * 编码格式: 6 字节 = hole_index(2B) + 0x00(1B) + micro_step(1B) + crc(2B)
      */
-    int32_t enc = (int32_t)(mT_position & 0xFFFF);
+    int32_t enc = (int32_t)(mY_position & 0xFFFF);
 
     uint16_t hole_index;
     uint8_t  micro;
@@ -291,31 +285,31 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
     case R_MOTOR:
         switch (value) {
         case 0x8000:  /* 停止 */
-            mT_position     = 0;
-            mT_control_word = 0;
-            mT_modes        = 0;
+            mY_position     = 0;
+            mY_control_word = 0;
+            mY_modes        = 0;
             photometer_ch0  = 0;
             LOG_D("Motor: STOP");
             break;
 
         case 0x9000:  /* 正转 → 移动到目标孔位 */
-            mT_position     = slot_positions[g_cur_slot];
-            mT_control_word = 0x5355;
-            mT_modes        = 0x04;   /* 旋转模式 */
+            mY_position     = slot_positions[g_cur_slot];
+            mY_control_word = 0x5355;
+            mY_modes        = 0x04;   /* 旋转模式 */
             photometer_ch0  = 0x0018; /* 测量模式 */
             LOG_D("Motor: GO → slot %d (pos=%ld)", g_cur_slot,
                   (long)slot_positions[g_cur_slot]);
             break;
 
         case 0xA000:  /* 成品上位机用于运动后的保持/确认 */
-            mT_control_word = 0;
+            mY_control_word = 0;
             LOG_D("Motor: HOLD");
             break;
 
         case 0xC000:  /* 回零 */
-            mT_position     = SLOT_IDLE_POS;
-            mT_control_word = 0;
-            mT_modes        = 0;
+            mY_position     = SLOT_IDLE_POS;
+            mY_control_word = 0;
+            mY_modes        = 0;
             photometer_ch0  = 0x0000; /* 退出测量 */
             LOG_D("Motor: HOME → idle");
             break;
@@ -349,11 +343,9 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
     /* ── 0x0005: 泵状态 ── */
     case R_PUMP:
         if (value == 0x2000) {
-            mX_control_word = 0x0001;  /* 启动泵 */
-            mE_control_word = 0x9000;  /* 升降轴 */
+            mE_control_word = 0x9000;  /* 启动 E 柱塞泵 */
             LOG_D("Pump: START");
         } else if (value == 0x0000) {
-            mX_control_word = 0;
             mE_control_word = 0;
             LOG_D("Pump: STOP");
         }
@@ -362,8 +354,8 @@ void sampling_on_reg_write(uint16_t addr, uint16_t value)
     /* ── 0x0008: 步数参数 ── */
     case R_PERI_TURN:
         /*
-         * 上位机写的步数 (如 0x0BB8=3000) → 应通过 SDO 写 Node3 的
-         * Profile Velocity (0x6081) 或直接设 mT_velocity。
+         * 上位机写的步数 (如 0x0BB8=3000) → 应通过对应蠕动泵节点的
+         * Profile Velocity (0x6081)。蠕动泵未绑定到 X/Y/Z/E 主轴。
          * 当前简化: 记录步数, 实际运动参数由 SDO 配置。
          */
         LOG_D("Steps: %d", (int)value);
@@ -457,11 +449,10 @@ int sampling_init(void)
     g_hole_written = 0;
 
     /* 初始状态: 电机空闲 */
-    mT_position     = SLOT_IDLE_POS;
-    mT_control_word = 0;
-    mT_modes        = 0;
-    mX_control_word = 0;
+    mY_position     = SLOT_IDLE_POS;
     mY_control_word = 0;
+    mY_modes        = 0;
+    mX_control_word = 0;
     mZ_control_word = 0;
     mE_control_word = 0;
     photometer_ch0  = 0;
