@@ -61,27 +61,27 @@ const int32_t slot_positions[SLOT_COUNT] = {
 /* ═══════════════════════════════════════════════════════════════
  *  寄存器地址 (0-based Modbus frame address)
  * ═══════════════════════════════════════════════════════════════ */
-#define R_HOLE0      0     /* 0x0000 孔位编码 [3reg] */
-#define R_NEEDLE     3     /* 0x0003 针状态 */
-#define R_ACTION     4     /* 0x0004 动作命令 */
-#define R_PUMP       5     /* 0x0005 泵状态 */
-#define R_PERI_SPD   7     /* 0x0007 蠕动泵转速 */
-#define R_PERI_TURN  8     /* 0x0008 蠕动泵圈数 (步数) */
-#define R_MODE       9     /* 0x0009 模式 */
-#define R_TURNT_FN   10    /* 0x000A 转盘功能 */
-#define R_MOTOR      11    /* 0x000B 电机控制 */
-#define R_TURNT_POS0 12    /* 0x000C 转盘指定位号 [3reg]，按成品上位机实测帧地址 */
-#define R_TURNT_POS1 13
-#define R_TURNT_POS2 14
-#define R_LIGHT      15    /* 0x000F 光强 */
-#define R_DEV_STAT   17    /* 0x0011 设备状态 */
-#define R_COOLING    14    /* 0x000E 酶孔位制冷 (Modbus 00015) */
-#define R_HEAT       99    /* 0x0063 加热温度 */
-#define R_COOL       100   /* 0x0064 制冷温度 */
-#define R_PARAM      119   /* 0x0077 参数控制 */
-#define R_WEIGH      120   /* 0x0078 称重控制 */
-#define R_HEAT_TARGET 191  /* 0x00BF 协议 0192 加热目标温度 */
-#define R_COOL_TARGET 192  /* 0x00C0 协议 0193 制冷目标温度 */
+#define R_HOLE0      150   /* 0x0096 孔位编码 [3reg] */
+#define R_NEEDLE     61    /* 0x003D 针状态 */
+#define R_ACTION     24    /* 0x0018 动作命令 */
+#define R_PUMP       173   /* 0x00AD 泵状态 */
+#define R_PERI_SPD   38    /* 0x0026 蠕动泵转速 */
+#define R_PERI_TURN  91    /* 0x005B 蠕动泵圈数 (步数) */
+#define R_MODE       12    /* 0x000C 模式 */
+#define R_TURNT_FN   167   /* 0x00A7 转盘功能 */
+#define R_MOTOR      74    /* 0x004A 电机控制 */
+#define R_TURNT_POS0 118   /* 0x0076 转盘指定位号 [3reg] */
+#define R_TURNT_POS1 119
+#define R_TURNT_POS2 120
+#define R_LIGHT      44    /* 0x002C 光强 */
+#define R_DEV_STAT   5     /* 0x0005 设备状态 */
+#define R_COOLING    176   /* 0x00B0 酶孔位制冷 */
+#define R_HEAT       80    /* 0x0050 加热温度 */
+#define R_COOL       31    /* 0x001F 制冷温度 */
+#define R_PARAM      14    /* 0x000E 参数控制 */
+#define R_WEIGH      57    /* 0x0039 称重控制 */
+#define R_HEAT_TARGET 88   /* 0x0058 加热目标温度 */
+#define R_COOL_TARGET 89   /* 0x0059 制冷目标温度 */
 
 /* ── 当前选中的孔位索引 (0~6), 由上位机写模式寄存器间接选择 ── */
 static int g_cur_slot = 0;
@@ -477,8 +477,8 @@ int sampling_init(void)
         uint8_t dev_stat[4] = {0x1C, 0x00, 0x00, 0x01};  /* 0x1C00 0001 */
         reg_write_local(R_DEV_STAT, 2, dev_stat);
     }
-    usSRegHoldBuf[17] = 0x1C00;  /* 兜底: Modbus 本地缓存 */
-    usSRegHoldBuf[18] = 0x0001;
+    usSRegHoldBuf[R_DEV_STAT] = 0x1C00;  /* 兜底: Modbus 本地缓存 */
+    usSRegHoldBuf[R_DEV_STAT + 1] = 0x0001;
 
     LOG_I("Sampling init — Modbus→CAN gateway ready");
     return 0;
@@ -495,13 +495,13 @@ static int mbreg(int argc, char **argv)
 {
     if (argc < 2) {
         rt_kprintf("Usage: mbreg <addr> <value>\n");
-        rt_kprintf("  Cool ON:    mbreg 14 1\n");
-        rt_kprintf("  Cool OFF:   mbreg 14 0\n");
-        rt_kprintf("  Heat temp:  mbreg 191 25\n");
-        rt_kprintf("  Cool temp:  mbreg 192 10\n");
-        rt_kprintf("  Motor STOP: mbreg 11 0x8000\n");
-        rt_kprintf("  Motor GO:   mbreg 11 0x9000\n");
-        rt_kprintf("  Pump ON:    mbreg 5 0x2000\n");
+        rt_kprintf("  Cool ON:    mbreg 176 1\n");
+        rt_kprintf("  Cool OFF:   mbreg 176 0\n");
+        rt_kprintf("  Heat temp:  mbreg 88 25\n");
+        rt_kprintf("  Cool temp:  mbreg 89 10\n");
+        rt_kprintf("  Motor STOP: mbreg 74 0x8000\n");
+        rt_kprintf("  Motor GO:   mbreg 74 0x9000\n");
+        rt_kprintf("  Pump ON:    mbreg 173 0x2000\n");
         rt_kprintf("  Read reg:   mbreg <addr>\n");
         rt_kprintf("  (addr = 0-based decimal, 0x for hex)\n");
         return 0;

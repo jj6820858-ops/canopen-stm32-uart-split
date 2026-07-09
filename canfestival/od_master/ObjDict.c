@@ -169,8 +169,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1200 :   Server SDO Parameter. */
                     UNS8 Master_highestSubIndex_obj1200 = 2; /* number of subindex - 1*/
-                    UNS32 Master_obj1200_COB_ID_Client_to_Server_Receive_SDO = 0x601;	/* 1537 */
-                    UNS32 Master_obj1200_COB_ID_Server_to_Client_Transmit_SDO = 0x581;	/* 1409 */
+                    UNS32 Master_obj1200_COB_ID_Client_to_Server_Receive_SDO = 0x605;	/* 1541 */
+                    UNS32 Master_obj1200_COB_ID_Server_to_Client_Transmit_SDO = 0x585;	/* 1413 */
                     subindex Master_Index1200[] = 
                      {
                        { RO, uint8, sizeof (UNS8), (void*)&Master_highestSubIndex_obj1200 },
@@ -180,8 +180,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1280 :   Client SDO 1 Parameter. */
                     UNS8 Master_highestSubIndex_obj1280 = 3; /* number of subindex - 1*/
-                    UNS32 Master_obj1280_COB_ID_Client_to_Server_Transmit_SDO = 0x601;	/* 1537 */
-                    UNS32 Master_obj1280_COB_ID_Server_to_Client_Receive_SDO = 0x581;	/* 1409 */
+                    UNS32 Master_obj1280_COB_ID_Client_to_Server_Transmit_SDO = 0x605;	/* 1541 */
+                    UNS32 Master_obj1280_COB_ID_Server_to_Client_Receive_SDO = 0x585;	/* 1413 */
                     UNS8 Master_obj1280_Node_ID_of_the_SDO_Server = 0x1;	/* 1 */
                     subindex Master_Index1280[] = 
                      {
@@ -193,8 +193,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1281 :   Client SDO 2 Parameter. */
                     UNS8 Master_highestSubIndex_obj1281 = 3; /* number of subindex - 1*/
-                    UNS32 Master_obj1281_COB_ID_Client_to_Server_Transmit_SDO = 0x602;	/* 1538 */
-                    UNS32 Master_obj1281_COB_ID_Server_to_Client_Receive_SDO = 0x582;	/* 1410 */
+                    UNS32 Master_obj1281_COB_ID_Client_to_Server_Transmit_SDO = 0x604;	/* 1540 */
+                    UNS32 Master_obj1281_COB_ID_Server_to_Client_Receive_SDO = 0x584;	/* 1412 */
                     UNS8 Master_obj1281_Node_ID_of_the_SDO_Server = 0x2;	/* 2 */
                     subindex Master_Index1281[] = 
                      {
@@ -206,8 +206,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1282 :   Client SDO 3 Parameter. */
                     UNS8 Master_highestSubIndex_obj1282 = 3; /* number of subindex - 1*/
-                    UNS32 Master_obj1282_COB_ID_Client_to_Server_Transmit_SDO = 0x603;	/* 1539 */
-                    UNS32 Master_obj1282_COB_ID_Server_to_Client_Receive_SDO = 0x583;	/* 1411 */
+                    UNS32 Master_obj1282_COB_ID_Client_to_Server_Transmit_SDO = 0x601;	/* 1537 */
+                    UNS32 Master_obj1282_COB_ID_Server_to_Client_Receive_SDO = 0x581;	/* 1409 */
                     UNS8 Master_obj1282_Node_ID_of_the_SDO_Server = 0x3;	/* 3 */
                     subindex Master_Index1282[] = 
                      {
@@ -219,8 +219,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1283 :   Client SDO 4 Parameter. */
                     UNS8 Master_highestSubIndex_obj1283 = 3; /* number of subindex - 1*/
-                    UNS32 Master_obj1283_COB_ID_Client_to_Server_Transmit_SDO = 0x604;	/* 1540 */
-                    UNS32 Master_obj1283_COB_ID_Server_to_Client_Receive_SDO = 0x584;	/* 1412 */
+                    UNS32 Master_obj1283_COB_ID_Client_to_Server_Transmit_SDO = 0x602;	/* 1538 */
+                    UNS32 Master_obj1283_COB_ID_Server_to_Client_Receive_SDO = 0x582;	/* 1410 */
                     UNS8 Master_obj1283_Node_ID_of_the_SDO_Server = 0x4;	/* 4 */
                     subindex Master_Index1283[] = 
                      {
@@ -232,8 +232,8 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1284 :   Client SDO 5 Parameter. */
                     UNS8 Master_highestSubIndex_obj1284 = 3; /* number of subindex - 1*/
-                    UNS32 Master_obj1284_COB_ID_Client_to_Server_Transmit_SDO = 0x605;	/* 1541 */
-                    UNS32 Master_obj1284_COB_ID_Server_to_Client_Receive_SDO = 0x585;	/* 1413 */
+                    UNS32 Master_obj1284_COB_ID_Client_to_Server_Transmit_SDO = 0x603;	/* 1539 */
+                    UNS32 Master_obj1284_COB_ID_Server_to_Client_Receive_SDO = 0x583;	/* 1411 */
                     UNS8 Master_obj1284_Node_ID_of_the_SDO_Server = 0x5;	/* 5 */
                     subindex Master_Index1284[] = 
                      {
@@ -245,7 +245,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1400 :   Receive PDO 1 Parameter. */
                     UNS8 Master_highestSubIndex_obj1400 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1400_COB_ID_used_by_PDO = 0x181;	/* 385 */
+                    UNS32 Master_obj1400_COB_ID_used_by_PDO = 0x186;	/* 390 */
                     UNS8 Master_obj1400_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1400_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1400_Compatibility_Entry = 0x0;	/* 0 */
@@ -264,7 +264,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1401 :   Receive PDO 2 Parameter. */
                     UNS8 Master_highestSubIndex_obj1401 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1401_COB_ID_used_by_PDO = 0x182;	/* 386 */
+                    UNS32 Master_obj1401_COB_ID_used_by_PDO = 0x183;	/* 387 */
                     UNS8 Master_obj1401_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1401_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1401_Compatibility_Entry = 0x0;	/* 0 */
@@ -283,7 +283,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1402 :   Receive PDO 3 Parameter. */
                     UNS8 Master_highestSubIndex_obj1402 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1402_COB_ID_used_by_PDO = 0x183;	/* 387 */
+                    UNS32 Master_obj1402_COB_ID_used_by_PDO = 0x188;	/* 392 */
                     UNS8 Master_obj1402_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1402_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1402_Compatibility_Entry = 0x0;	/* 0 */
@@ -302,7 +302,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1403 :   Receive PDO 4 Parameter. */
                     UNS8 Master_highestSubIndex_obj1403 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1403_COB_ID_used_by_PDO = 0x184;	/* 388 */
+                    UNS32 Master_obj1403_COB_ID_used_by_PDO = 0x181;	/* 385 */
                     UNS8 Master_obj1403_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1403_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1403_Compatibility_Entry = 0x0;	/* 0 */
@@ -321,7 +321,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1404 :   Receive PDO 5 Parameter. */
                     UNS8 Master_highestSubIndex_obj1404 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1404_COB_ID_used_by_PDO = 0x185;	/* 389 */
+                    UNS32 Master_obj1404_COB_ID_used_by_PDO = 0x287;	/* 647 */
                     UNS8 Master_obj1404_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1404_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1404_Compatibility_Entry = 0x0;	/* 0 */
@@ -340,7 +340,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1405 :   Receive PDO 6 Parameter. */
                     UNS8 Master_highestSubIndex_obj1405 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1405_COB_ID_used_by_PDO = 0x186;	/* 390 */
+                    UNS32 Master_obj1405_COB_ID_used_by_PDO = 0x184;	/* 388 */
                     UNS8 Master_obj1405_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1405_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1405_Compatibility_Entry = 0x0;	/* 0 */
@@ -359,7 +359,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1406 :   Receive PDO 7 Parameter. */
                     UNS8 Master_highestSubIndex_obj1406 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1406_COB_ID_used_by_PDO = 0x187;	/* 391 */
+                    UNS32 Master_obj1406_COB_ID_used_by_PDO = 0x288;	/* 648 */
                     UNS8 Master_obj1406_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1406_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1406_Compatibility_Entry = 0x0;	/* 0 */
@@ -378,7 +378,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1407 :   Receive PDO 8 Parameter. */
                     UNS8 Master_highestSubIndex_obj1407 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1407_COB_ID_used_by_PDO = 0x287;	/* 647 */
+                    UNS32 Master_obj1407_COB_ID_used_by_PDO = 0x182;	/* 386 */
                     UNS8 Master_obj1407_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1407_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1407_Compatibility_Entry = 0x0;	/* 0 */
@@ -397,7 +397,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1408 :   Receive PDO 9 Parameter. */
                     UNS8 Master_highestSubIndex_obj1408 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1408_COB_ID_used_by_PDO = 0x188;	/* 392 */
+                    UNS32 Master_obj1408_COB_ID_used_by_PDO = 0x185;	/* 389 */
                     UNS8 Master_obj1408_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1408_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1408_Compatibility_Entry = 0x0;	/* 0 */
@@ -416,7 +416,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1409 :   Receive PDO 10 Parameter. */
                     UNS8 Master_highestSubIndex_obj1409 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1409_COB_ID_used_by_PDO = 0x288;	/* 648 */
+                    UNS32 Master_obj1409_COB_ID_used_by_PDO = 0x187;	/* 391 */
                     UNS8 Master_obj1409_Transmission_Type = 0x0;	/* 0 */
                     UNS16 Master_obj1409_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1409_Compatibility_Entry = 0x0;	/* 0 */
@@ -571,7 +571,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1800 :   Transmit PDO 1 Parameter. */
                     UNS8 Master_highestSubIndex_obj1800 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1800_COB_ID_used_by_PDO = 0x201;	/* 513 */
+                    UNS32 Master_obj1800_COB_ID_used_by_PDO = 0x304;	/* 772 */
                     UNS8 Master_obj1800_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1800_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1800_Compatibility_Entry = 0x0;	/* 0 */
@@ -600,7 +600,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1801 :   Transmit PDO 2 Parameter. */
                     UNS8 Master_highestSubIndex_obj1801 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1801_COB_ID_used_by_PDO = 0x301;	/* 769 */
+                    UNS32 Master_obj1801_COB_ID_used_by_PDO = 0x203;	/* 515 */
                     UNS8 Master_obj1801_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1801_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1801_Compatibility_Entry = 0x0;	/* 0 */
@@ -629,7 +629,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1802 :   Transmit PDO 3 Parameter. */
                     UNS8 Master_highestSubIndex_obj1802 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1802_COB_ID_used_by_PDO = 0x202;	/* 514 */
+                    UNS32 Master_obj1802_COB_ID_used_by_PDO = 0x306;	/* 774 */
                     UNS8 Master_obj1802_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1802_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1802_Compatibility_Entry = 0x0;	/* 0 */
@@ -658,7 +658,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1803 :   Transmit PDO 4 Parameter. */
                     UNS8 Master_highestSubIndex_obj1803 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1803_COB_ID_used_by_PDO = 0x302;	/* 770 */
+                    UNS32 Master_obj1803_COB_ID_used_by_PDO = 0x201;	/* 513 */
                     UNS8 Master_obj1803_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1803_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1803_Compatibility_Entry = 0x0;	/* 0 */
@@ -687,7 +687,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1804 :   Transmit PDO 5 Parameter. */
                     UNS8 Master_highestSubIndex_obj1804 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1804_COB_ID_used_by_PDO = 0x203;	/* 515 */
+                    UNS32 Master_obj1804_COB_ID_used_by_PDO = 0x307;	/* 775 */
                     UNS8 Master_obj1804_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1804_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1804_Compatibility_Entry = 0x0;	/* 0 */
@@ -716,7 +716,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1805 :   Transmit PDO 6 Parameter. */
                     UNS8 Master_highestSubIndex_obj1805 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1805_COB_ID_used_by_PDO = 0x303;	/* 771 */
+                    UNS32 Master_obj1805_COB_ID_used_by_PDO = 0x205;	/* 517 */
                     UNS8 Master_obj1805_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1805_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1805_Compatibility_Entry = 0x0;	/* 0 */
@@ -745,7 +745,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1806 :   Transmit PDO 7 Parameter. */
                     UNS8 Master_highestSubIndex_obj1806 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1806_COB_ID_used_by_PDO = 0x204;	/* 516 */
+                    UNS32 Master_obj1806_COB_ID_used_by_PDO = 0x302;	/* 770 */
                     UNS8 Master_obj1806_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1806_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1806_Compatibility_Entry = 0x0;	/* 0 */
@@ -774,7 +774,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1807 :   Transmit PDO 8 Parameter. */
                     UNS8 Master_highestSubIndex_obj1807 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1807_COB_ID_used_by_PDO = 0x304;	/* 772 */
+                    UNS32 Master_obj1807_COB_ID_used_by_PDO = 0x207;	/* 519 */
                     UNS8 Master_obj1807_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1807_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1807_Compatibility_Entry = 0x0;	/* 0 */
@@ -803,7 +803,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1808 :   Transmit PDO 9 Parameter. */
                     UNS8 Master_highestSubIndex_obj1808 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1808_COB_ID_used_by_PDO = 0x205;	/* 517 */
+                    UNS32 Master_obj1808_COB_ID_used_by_PDO = 0x301;	/* 769 */
                     UNS8 Master_obj1808_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1808_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1808_Compatibility_Entry = 0x0;	/* 0 */
@@ -832,7 +832,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x1809 :   Transmit PDO 10 Parameter. */
                     UNS8 Master_highestSubIndex_obj1809 = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj1809_COB_ID_used_by_PDO = 0x305;	/* 773 */
+                    UNS32 Master_obj1809_COB_ID_used_by_PDO = 0x204;	/* 516 */
                     UNS8 Master_obj1809_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj1809_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj1809_Compatibility_Entry = 0x0;	/* 0 */
@@ -861,7 +861,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x180A :   Transmit PDO 11 Parameter. */
                     UNS8 Master_highestSubIndex_obj180A = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj180A_COB_ID_used_by_PDO = 0x206;	/* 518 */
+                    UNS32 Master_obj180A_COB_ID_used_by_PDO = 0x303;	/* 771 */
                     UNS8 Master_obj180A_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj180A_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj180A_Compatibility_Entry = 0x0;	/* 0 */
@@ -890,7 +890,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x180B :   Transmit PDO 12 Parameter. */
                     UNS8 Master_highestSubIndex_obj180B = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj180B_COB_ID_used_by_PDO = 0x207;	/* 519 */
+                    UNS32 Master_obj180B_COB_ID_used_by_PDO = 0x206;	/* 518 */
                     UNS8 Master_obj180B_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj180B_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj180B_Compatibility_Entry = 0x0;	/* 0 */
@@ -919,7 +919,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x180C :   Transmit PDO 13 Parameter. */
                     UNS8 Master_highestSubIndex_obj180C = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj180C_COB_ID_used_by_PDO = 0x307;	/* 775 */
+                    UNS32 Master_obj180C_COB_ID_used_by_PDO = 0x202;	/* 514 */
                     UNS8 Master_obj180C_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj180C_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj180C_Compatibility_Entry = 0x0;	/* 0 */
@@ -948,7 +948,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 /* index 0x180D :   Transmit PDO 14 Parameter. */
                     UNS8 Master_highestSubIndex_obj180D = 6; /* number of subindex - 1*/
-                    UNS32 Master_obj180D_COB_ID_used_by_PDO = 0x306;	/* 774 */
+                    UNS32 Master_obj180D_COB_ID_used_by_PDO = 0x305;	/* 773 */
                     UNS8 Master_obj180D_Transmission_Type = 0xFF;	/* 255 */
                     UNS16 Master_obj180D_Inhibit_Time = 0x0;	/* 0 */
                     UNS8 Master_obj180D_Compatibility_Entry = 0x0;	/* 0 */
