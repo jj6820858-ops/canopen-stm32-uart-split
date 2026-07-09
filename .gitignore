@@ -35,8 +35,6 @@ RELEASE_NOTE.txt
 *.dotx
 docx_render/
 
-# Local communication analysis notes are kept off the published repository
-docs/*.md
-docs/superpowers/plans/*.md
-docs/superpowers/specs/*.md
+# Local documents are kept off the published repository
+docs/
 tools/modbus_host/README.md
