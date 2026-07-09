@@ -27,3 +27,16 @@ jlink*
 .metadata/
 RELEASE_NOTE.txt
 *.rttlaunch
+
+# Local documents and generated document renders
+*.doc
+*.docx
+*.docm
+*.dotx
+docx_render/
+
+# Local communication analysis notes are kept off the published repository
+docs/*.md
+docs/superpowers/plans/*.md
+docs/superpowers/specs/*.md
+tools/modbus_host/README.md
